@@ -1,0 +1,26 @@
+{
+  "name": "banque-familiale",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PWA de gestion d'argent de poche familial",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "predev": "npm run build -w packages/shared",
+    "dev": "concurrently -n shared,api,web -c yellow,blue,green \"npm run dev -w packages/shared\" \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "build": "npm run build -w packages/shared && npm run build -w apps/api && npm run build -w apps/web",
+    "lint": "npm run lint -w apps/api && npm run lint -w apps/web",
+    "format": "prettier --write .",
+    "test": "npm run test -w apps/api --if-present && npm run test -w apps/web --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
