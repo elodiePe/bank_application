@@ -13,6 +13,15 @@ export function createTransactionRepository(prisma: PrismaClient) {
     createMany(data: Prisma.TransactionCreateManyInput[]) {
       return prisma.transaction.createMany({ data });
     },
+
+    listRecentForFamily(familyId: string, limit: number) {
+      return prisma.transaction.findMany({
+        where: { account: { user: { familyId } } },
+        orderBy: { occurredAt: 'desc' },
+        take: limit,
+        include: { account: { include: { user: true } } },
+      });
+    },
   };
 }
 

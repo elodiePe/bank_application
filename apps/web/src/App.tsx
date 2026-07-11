@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { RootLayout } from './layouts/RootLayout.js';
-import { DashboardPlaceholderPage } from './pages/DashboardPlaceholderPage.js';
+import { DashboardRouter } from './pages/DashboardRouter.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { RequireAuth } from './components/RequireAuth.js';
 
@@ -16,7 +16,7 @@ export function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<DashboardPlaceholderPage />} />
+          <Route index element={<DashboardRouter />} />
         </Route>
       </Routes>
     </BrowserRouter>

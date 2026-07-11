@@ -121,4 +121,5 @@ Développement itératif par étapes (voir le plan associé).
 - [x] Étape 1 — Modèle de données Prisma + seed de la famille de démo
 - [x] Étape 2 — Authentification (mot de passe/PIN parents, PIN enfants)
 - [x] Étape 3 — Script d'import CSV réutilisable + calcul automatique des soldes
-- [ ] Étape 4 — Dashboard Parent (lecture : soldes, historiques, demandes en attente)
+- [x] Étape 4 — Dashboard Parent (lecture : soldes, historiques, demandes en attente)
+- [ ] Étape 5 — Actions Parent (dépôt/retrait, virement, correction, taux d'intérêt)

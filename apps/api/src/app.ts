@@ -6,6 +6,7 @@ import { env } from './utils/env.js';
 import { prisma } from './database/prismaClient.js';
 import { healthRouter } from './routes/health.routes.js';
 import { createAuthRouter } from './routes/auth.routes.js';
+import { createDashboardRouter } from './routes/dashboard.routes.js';
 
 export function createApp() {
   const app = express();
@@ -17,6 +18,7 @@ export function createApp() {
 
   app.use('/health', healthRouter);
   app.use('/auth', createAuthRouter(prisma));
+  app.use('/dashboard', createDashboardRouter(prisma));
 
   return app;
 }
