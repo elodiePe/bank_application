@@ -59,6 +59,21 @@ Le schéma Prisma vit dans [`apps/api/prisma/schema.prisma`](apps/api/prisma/sch
 (mots de passe/PIN en clair) sont documentés dans [`apps/api/prisma/seed.ts`](apps/api/prisma/seed.ts) —
 usage local uniquement.
 
+## Authentification
+
+Sessions via JWT en cookies `httpOnly` (jamais `localStorage`, pour limiter l'exposition XSS) :
+
+- **Parents** : mot de passe (`POST /auth/login-password`), PIN optionnel prévu pour plus tard.
+- **Enfants** : PIN à 4 chiffres (`POST /auth/login-pin`).
+- **Verrouillage** : un compte est bloqué 15 minutes après 5 échecs consécutifs — indispensable
+  pour un PIN à 4 chiffres qui n'a que 10 000 combinaisons possibles.
+- **Refresh token** : rotaté à chaque `POST /auth/refresh`, révocable en base (table
+  `RefreshSession`) pour permettre une vraie déconnexion et une révocation en cas d'incident.
+- **Extensibilité biométrique** : les vérifications d'identifiants passent par une interface
+  `CredentialStrategy` ([`apps/api/src/services/authStrategies.ts`](apps/api/src/services/authStrategies.ts)) ;
+  ajouter Face ID/Touch ID plus tard (WebAuthn/passkeys) ne demandera qu'une nouvelle stratégie,
+  pas de changement dans `authService`.
+
 ## Scripts racine
 
 | Commande         | Description                                      |
@@ -75,4 +90,5 @@ Développement itératif par étapes (voir le plan associé).
 
 - [x] Étape 0 — Fondations du monorepo
 - [x] Étape 1 — Modèle de données Prisma + seed de la famille de démo
-- [ ] Étape 2 — Authentification (mot de passe/PIN parents, PIN enfants)
+- [x] Étape 2 — Authentification (mot de passe/PIN parents, PIN enfants)
+- [ ] Étape 3 — Script d'import CSV réutilisable + calcul automatique des soldes

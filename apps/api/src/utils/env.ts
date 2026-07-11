@@ -12,4 +12,9 @@ export const env = {
   port: Number(required('PORT', '4000')),
   nodeEnv: required('NODE_ENV', 'development'),
   webOrigin: required('WEB_ORIGIN', 'http://localhost:5173'),
+  jwtAccessSecret: required('JWT_ACCESS_SECRET'),
+  jwtRefreshSecret: required('JWT_REFRESH_SECRET'),
+  jwtAccessTtlSeconds: Number(required('JWT_ACCESS_TTL_SECONDS', '900')),
+  jwtRefreshTtlSeconds: Number(required('JWT_REFRESH_TTL_SECONDS', '2592000')),
+  cookieSecure: required('COOKIE_SECURE', 'false') === 'true',
 };

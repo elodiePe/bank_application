@@ -78,19 +78,25 @@ model User {
   passwordHash String?
   /// Required for children, optional for parents — bcrypt hash of a 4-digit PIN.
   pinHash      String?
+
+  /// Brute-force protection — a 4-digit PIN only has 10 000 combinations.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   childAccount ChildAccount?
 
-  notificationsReceived  Notification[] @relation("NotificationRecipient")
-  moneyRequestsMade      MoneyRequest[] @relation("MoneyRequestRequester")
-  moneyRequestsTargeted  MoneyRequest[] @relation("MoneyRequestTarget")
-  moneyRequestsResponded MoneyRequest[] @relation("MoneyRequestResponder")
-  transactionsSent       Transaction[]  @relation("TransactionSender")
-  transactionsReceived   Transaction[]  @relation("TransactionReceiver")
-  transactionsValidated  Transaction[]  @relation("TransactionValidator")
-  auditLogs              AuditLog[]     @relation("AuditLogActor")
+  notificationsReceived  Notification[]   @relation("NotificationRecipient")
+  moneyRequestsMade      MoneyRequest[]   @relation("MoneyRequestRequester")
+  moneyRequestsTargeted  MoneyRequest[]   @relation("MoneyRequestTarget")
+  moneyRequestsResponded MoneyRequest[]   @relation("MoneyRequestResponder")
+  transactionsSent       Transaction[]    @relation("TransactionSender")
+  transactionsReceived   Transaction[]    @relation("TransactionReceiver")
+  transactionsValidated  Transaction[]    @relation("TransactionValidator")
+  auditLogs              AuditLog[]       @relation("AuditLogActor")
+  refreshSessions        RefreshSession[]
 
   @@index([familyId])
 }
@@ -234,4 +240,19 @@ model AuditLog {
 
   @@index([actorId])
   @@index([entityType, entityId])
+}
+
+/// Persisted so refresh tokens can be revoked (logout, rotation, security incident)
+/// instead of relying purely on stateless JWT expiry.
+model RefreshSession {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 hash of the refresh token — the raw token is never stored.
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
