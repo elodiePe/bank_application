@@ -35,11 +35,29 @@ le bundler du frontend comme demandé, sans dépendre d'un framework full-stack.
 npm install
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
+npm run -w apps/api db:migrate   # crée apps/api/prisma/dev.db et applique le schéma
 npm run dev
 ```
 
 - API : http://localhost:4000 (health check : `GET /health`)
 - Web : http://localhost:5173
+
+## Base de données
+
+Le schéma Prisma vit dans [`apps/api/prisma/schema.prisma`](apps/api/prisma/schema.prisma) :
+`Family`, `User`, `ChildAccount`, `Transaction`, `MoneyRequest`, `Notification`,
+`InterestHistory`, `Settings`, `AuditLog`. Tous les montants sont stockés en **centimes**
+(entiers) pour éviter les erreurs d'arrondi.
+
+| Commande (depuis `apps/api`) | Description                                                |
+| ----------------------------- | ----------------------------------------------------------- |
+| `npm run db:migrate`          | Crée/applique une migration (dev)                           |
+| `npm run db:seed`             | (Re)crée la famille de démo (Papa, Maman, Elodie, Matthieu, Damien) — idempotent |
+| `npm run db:studio`           | Ouvre Prisma Studio pour explorer les données                |
+
+`db:migrate` exécute automatiquement `db:seed` après la migration. Les identifiants de démo
+(mots de passe/PIN en clair) sont documentés dans [`apps/api/prisma/seed.ts`](apps/api/prisma/seed.ts) —
+usage local uniquement.
 
 ## Scripts racine
 
@@ -53,5 +71,8 @@ npm run dev
 
 ## État du projet
 
-Développement itératif par étapes (voir le plan associé). Étape actuelle : **0 — Fondations du
-monorepo**.
+Développement itératif par étapes (voir le plan associé).
+
+- [x] Étape 0 — Fondations du monorepo
+- [x] Étape 1 — Modèle de données Prisma + seed de la famille de démo
+- [ ] Étape 2 — Authentification (mot de passe/PIN parents, PIN enfants)

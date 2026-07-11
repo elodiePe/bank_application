@@ -1,0 +1,237 @@
+// Schéma de données de la Banque Familiale.
+// Tous les montants sont stockés en centimes (Int) pour éviter les erreurs d'arrondi.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PARENT
+  CHILD
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  INTEREST
+  TRANSFER
+  REQUEST
+  VALIDATION
+  REFUSAL
+  CORRECTION
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+  REVERSED
+}
+
+enum MoneyRequestType {
+  DEPOSIT_REQUEST
+  WITHDRAWAL_REQUEST
+  TRANSFER_REQUEST
+}
+
+enum MoneyRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  MONEY_REQUEST_CREATED
+  MONEY_REQUEST_APPROVED
+  MONEY_REQUEST_REJECTED
+  TRANSFER_RECEIVED
+  DEPOSIT_RECEIVED
+  WITHDRAWAL_PROCESSED
+  INTEREST_APPLIED
+  CORRECTION_APPLIED
+  GENERIC
+}
+
+model Family {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users    User[]
+  settings Settings?
+}
+
+model User {
+  id           String   @id @default(cuid())
+  familyId     String
+  family       Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  role         Role
+  firstName    String
+  /// Parents only — bcrypt hash.
+  passwordHash String?
+  /// Required for children, optional for parents — bcrypt hash of a 4-digit PIN.
+  pinHash      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  childAccount ChildAccount?
+
+  notificationsReceived  Notification[] @relation("NotificationRecipient")
+  moneyRequestsMade      MoneyRequest[] @relation("MoneyRequestRequester")
+  moneyRequestsTargeted  MoneyRequest[] @relation("MoneyRequestTarget")
+  moneyRequestsResponded MoneyRequest[] @relation("MoneyRequestResponder")
+  transactionsSent       Transaction[]  @relation("TransactionSender")
+  transactionsReceived   Transaction[]  @relation("TransactionReceiver")
+  transactionsValidated  Transaction[]  @relation("TransactionValidator")
+  auditLogs              AuditLog[]     @relation("AuditLogActor")
+
+  @@index([familyId])
+}
+
+model ChildAccount {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balanceCents Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  transactions    Transaction[]
+  interestHistory InterestHistory[]
+}
+
+model Transaction {
+  id                 String             @id @default(cuid())
+  accountId          String
+  account            ChildAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type               TransactionType
+  status             TransactionStatus  @default(COMPLETED)
+  amountCents        Int
+  balanceBeforeCents Int
+  balanceAfterCents  Int
+  comment            String?
+
+  senderId   String?
+  sender     User?   @relation("TransactionSender", fields: [senderId], references: [id])
+  receiverId String?
+  receiver   User?   @relation("TransactionReceiver", fields: [receiverId], references: [id])
+
+  /// Parent who validated/performed this operation (null for automated interest).
+  validatedById String?
+  validatedBy   User?   @relation("TransactionValidator", fields: [validatedById], references: [id])
+
+  /// Links the two legs (debit/credit) of a transfer between two child accounts.
+  transferGroupId String?
+
+  /// Self-relation: a correction is a new transaction reversing an earlier one.
+  reversalOfId String?      @unique
+  reversalOf   Transaction? @relation("TransactionReversal", fields: [reversalOfId], references: [id])
+  reversedBy   Transaction? @relation("TransactionReversal")
+
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([accountId])
+  @@index([transferGroupId])
+  @@index([occurredAt])
+}
+
+model MoneyRequest {
+  id     String @id @default(cuid())
+
+  requesterId String
+  requester   User   @relation("MoneyRequestRequester", fields: [requesterId], references: [id])
+
+  /// Null when the request targets "the parents" generically rather than one sibling.
+  targetUserId String?
+  targetUser   User?   @relation("MoneyRequestTarget", fields: [targetUserId], references: [id])
+
+  type   MoneyRequestType
+  status MoneyRequestStatus @default(PENDING)
+
+  amountCents Int
+  comment     String?
+
+  respondedById String?
+  respondedBy   User?     @relation("MoneyRequestResponder", fields: [respondedById], references: [id])
+  respondedAt   DateTime?
+
+  /// Set once approved, linking to the transaction(s) it produced.
+  transferGroupId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requesterId])
+  @@index([targetUserId])
+  @@index([status])
+}
+
+model Notification {
+  id     String           @id @default(cuid())
+  userId String
+  user   User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  type   NotificationType
+
+  title  String
+  body   String
+  isRead Boolean @default(false)
+
+  relatedTransactionId  String?
+  relatedMoneyRequestId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+}
+
+model InterestHistory {
+  id            String       @id @default(cuid())
+  accountId     String
+  account       ChildAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// Normalized to the 1st day of the month the interest was earned for.
+  month         DateTime
+  rateBps       Int
+  amountCents   Int
+  transactionId String       @unique
+  createdAt     DateTime     @default(now())
+
+  @@unique([accountId, month])
+}
+
+model Settings {
+  id     String @id @default(cuid())
+  familyId String @unique
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  /// Interest rate in basis points (240 = 2.40%).
+  defaultInterestRateBps Int    @default(240)
+  currency               String @default("CHF")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id     String @id @default(cuid())
+  actorId String
+  actor   User   @relation("AuditLogActor", fields: [actorId], references: [id])
+
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+}
