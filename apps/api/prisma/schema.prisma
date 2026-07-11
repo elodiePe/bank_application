@@ -124,6 +124,10 @@ model Transaction {
   balanceAfterCents  Int
   comment            String?
 
+  /// Stable identifier for rows imported from an external source (e.g. a CSV history
+  /// file) so re-running an import never creates duplicates.
+  externalRef String? @unique
+
   senderId   String?
   sender     User?   @relation("TransactionSender", fields: [senderId], references: [id])
   receiverId String?

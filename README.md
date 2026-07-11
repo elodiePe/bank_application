@@ -15,7 +15,7 @@ apps/
 packages/
   shared/    Types et schémas partagés entre web et api
 data/
-  imports/   Emplacement prévu pour les CSV d'historique (Elodie, Matthieu, Damien) — non versionnés
+  imports/   CSV d'historique (Elodie, Matthieu, Damien) — données personnelles, jamais versionnées
 ```
 
 **Pourquoi un backend séparé plutôt que Next.js ou une base en local dans le navigateur ?**
@@ -74,6 +74,35 @@ Sessions via JWT en cookies `httpOnly` (jamais `localStorage`, pour limiter l'ex
   ajouter Face ID/Touch ID plus tard (WebAuthn/passkeys) ne demandera qu'une nouvelle stratégie,
   pas de changement dans `authService`.
 
+## Import d'historique CSV
+
+Le solde de chaque enfant est calculé automatiquement à partir de son historique, jamais saisi
+à la main. Format attendu (export MyKidsBank) :
+
+```
+month_index,period_start,period_end,date,description,withdrawal,deposit,balance,currency
+```
+
+Seules `date` (MM/DD/YYYY), `description`, `withdrawal`, `deposit` sont importées ; `balance` sert
+uniquement de **vérification** — le script recalcule sa propre valeur ligne par ligne et refuse
+d'importer si elle diverge du fichier (à moins de passer `--force`).
+
+```bash
+cd apps/api
+npm run import:csv -- --child Elodie --file "../../data/imports/mon-fichier.csv"
+```
+
+Le script est **réutilisable et idempotent** : chaque ligne est identifiée par
+`nom-de-fichier + numéro de ligne`, donc relancer avec le même fichier ne duplique rien. Un
+export ultérieur qui reprend le même nom de fichier avec des lignes ajoutées à la fin n'importe
+que les nouvelles lignes. Un fichier portant un **nom différent** est en revanche considéré comme
+une source distincte et importé intégralement, en s'ajoutant au solde déjà en base — pratique
+pour une correction ponctuelle, mais à garder en tête pour ne pas dupliquer un historique complet
+sous un autre nom.
+
+Les trois historiques réels ont été importés (voir `apps/api/prisma/seed.ts` pour les comptes
+correspondants) ; les fichiers CSV eux-mêmes restent dans `data/imports/` sans être versionnés.
+
 ## Scripts racine
 
 | Commande         | Description                                      |
@@ -91,4 +120,5 @@ Développement itératif par étapes (voir le plan associé).
 - [x] Étape 0 — Fondations du monorepo
 - [x] Étape 1 — Modèle de données Prisma + seed de la famille de démo
 - [x] Étape 2 — Authentification (mot de passe/PIN parents, PIN enfants)
-- [ ] Étape 3 — Script d'import CSV réutilisable + calcul automatique des soldes
+- [x] Étape 3 — Script d'import CSV réutilisable + calcul automatique des soldes
+- [ ] Étape 4 — Dashboard Parent (lecture : soldes, historiques, demandes en attente)
