@@ -40,6 +40,8 @@ export function FamilyLoginPage() {
         <input
           id="ownerEmail"
           type="email"
+          autoComplete="email"
+          autoCapitalize="none"
           autoFocus
           {...register('ownerEmail')}
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
