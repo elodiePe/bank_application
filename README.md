@@ -195,24 +195,31 @@ statique** : il peut héberger `apps/web` (le build Vite) mais **ne peut pas ex�
 ### 1. Frontend → GitHub Pages
 
 Un workflow est déjà en place : [`.github/workflows/deploy-web.yml`](.github/workflows/deploy-web.yml).
-Il se déclenche à chaque push sur `main` qui touche `apps/web` ou `packages/shared`, build avec le bon
-`base` (`/<nom-du-repo>/`, calculé automatiquement) et publie `apps/web/dist` sur GitHub Pages.
+Il se déclenche à chaque push sur `main` qui touche `apps/web` ou `packages/shared`, build et publie
+`apps/web/dist` sur GitHub Pages.
+
+Le site est servi sous un domaine personnalisé (`app.unmatched.ch`, voir §4) plutôt que sous
+`<utilisateur>.github.io/<nom-du-repo>/` — c'est nécessaire pour l'authentification (voir §4), pas
+juste cosmétique.
 
 Étapes ponctuelles à faire une fois, dans les réglages du dépôt GitHub :
 
 1. **Settings → Pages → Source** : choisir "GitHub Actions" (pas "Deploy from a branch").
 2. **Settings → Secrets and variables → Actions → Variables** : ajouter une variable **`VITE_API_URL`**
-   pointant vers l'API une fois déployée (étape 2 ci-dessous), ex. `https://banque-familiale-api.onrender.com`.
+   pointant vers l'API une fois déployée (étape 3 ci-dessous), ex. `https://api.unmatched.ch`.
    Sans elle, le frontend buildé pointera par défaut sur `http://localhost:4000`.
-3. Pousser sur `main` (ou lancer le workflow manuellement depuis l'onglet **Actions**) — le site sera
-   servi sur `https://<utilisateur>.github.io/<nom-du-repo>/`.
+3. **Settings → Pages → Custom domain** : renseigner `app.unmatched.ch`, cocher "Enforce HTTPS"
+   (peut prendre quelques minutes à s'activer, le temps que GitHub valide le certificat).
+4. Pousser sur `main` (ou lancer le workflow manuellement depuis l'onglet **Actions**).
 
 Détails techniques déjà gérés par le code (rien d'autre à faire) :
 
-- `vite.config.ts` lit `VITE_BASE_PATH` (mis à `/<repo>/` par le workflow) pour que tous les assets et
-  le manifest PWA se résolvent correctement sous un sous-chemin plutôt qu'à la racine du domaine.
-- `App.tsx` passe `basename={import.meta.env.BASE_URL}` à `BrowserRouter` pour que le routage
-  côté client tienne compte de ce même sous-chemin.
+- [`apps/web/public/CNAME`](apps/web/public/CNAME) contient `app.unmatched.ch` — copié tel quel dans
+  `dist/` à chaque build, donc le domaine personnalisé reste configuré après chaque déploiement
+  automatique (sans ce fichier, GitHub Pages oublierait le domaine au push suivant).
+- `vite.config.ts` lit `VITE_BASE_PATH` (mis à `/` par le workflow, car servi à la racine d'un domaine
+  personnalisé plutôt que sous un sous-chemin `/<repo>/`).
+- `App.tsx` passe `basename={import.meta.env.BASE_URL}` à `BrowserRouter`.
 - `scripts/copy-spa-fallback.mjs` (lancé par `npm run build:pages`) duplique `index.html` en
   `404.html` : GitHub Pages n'a pas de réécriture serveur, donc un lien profond (`/history`) rafraîchi
   renverrait un vrai 404 sans ce fallback classique pour les SPA.
@@ -236,12 +243,10 @@ automatique au déploiement via `prisma migrate deploy`, variables d'environneme
 1. Sur [render.com](https://render.com) : **New → Blueprint**, connecter ce dépôt GitHub — Render
    détecte `render.yaml` automatiquement.
 2. Renseigner les variables marquées `sync: false` dans le blueprint (non générées automatiquement) :
-   `WEB_ORIGIN` (l'URL GitHub Pages exacte, **sans** sous-chemin ni slash final — utilisée
-   uniquement pour le CORS, qui compare l'origine au caractère près), `WEB_APP_URL` (la même URL
-   mais **avec** le sous-chemin, ex. `https://username.github.io/bank_application` — c'est celle-ci
-   qui sert à construire les liens dans les e-mails ; une page GitHub Pages de type projet est
-   servie depuis un sous-chemin, pas la racine du domaine), `DATABASE_URL`/`DIRECT_URL` (étape 2
-   ci-dessus), `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (générer une paire dédiée à la
+   `WEB_ORIGIN` et `WEB_APP_URL` — une fois le domaine personnalisé en place (§4), les deux valent
+   `https://app.unmatched.ch` (sans slash final ; identiques ici puisque le site n'est plus servi
+   sous un sous-chemin), `DATABASE_URL`/`DIRECT_URL` (étape 2 ci-dessus),
+   `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (générer une paire dédiée à la
    prod avec `npx web-push generate-vapid-keys`, ne jamais réutiliser celle du `.env` de dev),
    `RESEND_API_KEY`/`EMAIL_FROM`, et `FINNHUB_API_KEY`.
    L'envoi d'e-mail passe par [Resend](https://resend.com) (API HTTP) plutôt que par du SMTP
@@ -250,10 +255,34 @@ automatique au déploiement via `prisma migrate deploy`, variables d'environneme
    identifiants. Sur Resend : créer un compte, vérifier le domaine d'envoi (`Domains` → ajouter les
    enregistrements DNS fournis chez l'hébergeur du domaine), puis créer une clé API.
 3. `COOKIE_SECURE=true` est déjà fixé dans le blueprint — indispensable en HTTPS : au-delà du
-   flag `Secure`, il fait aussi passer les cookies en `SameSite=None`, requis puisque le frontend
-   (GitHub Pages) et l'API (Render) sont sur des domaines différents.
-4. Renseigner `VITE_API_URL` (étape 1) avec l'URL Render obtenue ici, puis relancer le workflow
-   GitHub Pages.
+   flag `Secure`, il fait aussi passer les cookies en `SameSite=None`.
+4. Une fois le domaine personnalisé de l'API en place (§4), renseigner `VITE_API_URL` (§1) avec
+   `https://api.unmatched.ch`, puis relancer le workflow GitHub Pages.
+
+### 4. Domaines personnalisés (`app.unmatched.ch` + `api.unmatched.ch`)
+
+Sans domaine personnalisé, le frontend (`*.github.io`) et l'API (`*.onrender.com`) sont sur deux
+domaines totalement différents. Le cookie de session (`SameSite=None; Secure`) fonctionne dans ce
+cas, mais certains navigateurs (Chrome/Android en particulier, et tous les navigateurs en navigation
+privée) le traitent comme un **cookie tiers** et le bloquent silencieusement — la connexion échoue
+alors sans message d'erreur, y compris avec les bons identifiants. Héberger le frontend et l'API sous
+deux sous-domaines d'un même domaine (`unmatched.ch`) rend ce cookie **de même site** (« same-site »)
+du point de vue du navigateur, ce qui élimine complètement ce blocage.
+
+1. Chez l'hébergeur DNS du domaine (Infomaniak) : ajouter deux enregistrements, **sans toucher aux
+   enregistrements existants** (le site déjà en place sur `unmatched.ch`/`www.unmatched.ch` n'est pas
+   affecté — ce sont des sous-domaines distincts) :
+   - `app` → `CNAME` → `<utilisateur>.github.io.` (ex. `elodiepe.github.io.`, avec le point final)
+   - `api` → `CNAME` → la valeur exacte indiquée par Render (voir étape 3)
+2. Sur GitHub : **Settings → Pages → Custom domain** → `app.unmatched.ch` (voir §1, déjà détaillé).
+3. Sur Render : service API → **Settings → Custom Domains → Add Custom Domain** → `api.unmatched.ch`.
+   Render affiche alors la cible CNAME exacte à utiliser à l'étape 1 (le vérifier après ajout du
+   domaine sur Render, avant de créer l'enregistrement DNS).
+4. Mettre à jour les variables d'environnement pour refléter les nouveaux domaines : `WEB_ORIGIN`
+   et `WEB_APP_URL` sur Render → `https://app.unmatched.ch` ; `VITE_API_URL` dans les variables
+   GitHub Actions → `https://api.unmatched.ch`.
+5. La propagation DNS et l'émission du certificat HTTPS (côté GitHub comme côté Render) peuvent
+   prendre de quelques minutes à quelques heures.
 
 ## Scripts racine
 

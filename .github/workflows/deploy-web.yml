@@ -36,8 +36,11 @@ jobs:
       - name: Build web app
         # VITE_API_URL must point at wherever the API is hosted (GitHub Pages is
         # static-only and cannot run the Express/Prisma backend) — see README.
+        # VITE_BASE_PATH is '/' because the site is served from a custom domain
+        # (public/CNAME) at its root — GitHub's default project-page sub-path
+        # (/<repo-name>/) only applies when there's no custom domain configured.
         env:
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_BASE_PATH: /
           VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build:pages -w apps/web
 
