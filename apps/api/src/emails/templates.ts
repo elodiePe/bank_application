@@ -40,18 +40,16 @@ export function passwordChangedTemplate(params: { firstName: string }): EmailCon
 export function deleteAccountRequestTemplate(params: { familyName: string; confirmUrl: string }): EmailContent {
   const familyName = escapeHtml(params.familyName);
   return {
-    subject: 'Confirmez la suppression de votre compte famille — Banque Familiale',
+    subject: 'Confirmez la fermeture de votre compte famille — Banque Familiale',
     html: emailLayout({
-      previewText: `Confirmez la suppression définitive du compte ${familyName}`,
+      previewText: `Confirmez la fermeture du compte ${familyName}`,
       bodyHtml: `
-        <h1 style="margin:0 0 12px;font-size:18px;color:#b91c1c;">⚠️ Suppression du compte "${familyName}"</h1>
-        <p style="margin:0 0 8px;">Une demande de suppression définitive de votre compte famille a été effectuée.</p>
-        <p style="margin:12px 0;padding:12px 16px;background-color:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#7f1d1d;">
-          <strong>Cette action est irréversible.</strong> Tous les membres, comptes enfants, transactions, demandes et historiques de cette famille seront définitivement supprimés.
-        </p>
+        <h1 style="margin:0 0 12px;font-size:18px;">Fermeture du compte "${familyName}"</h1>
+        <p style="margin:0 0 8px;">Une demande de fermeture de votre compte famille a été effectuée.</p>
+        <p style="margin:0 0 8px;">Cette action ne peut pas être annulée par la suite : les membres, comptes enfants, transactions, demandes et historiques de cette famille seront supprimés.</p>
         <p style="margin:0 0 8px;">Si vous êtes à l'origine de cette demande, confirmez ci-dessous :</p>
-        ${emailButton({ href: params.confirmUrl, label: 'Confirmer la suppression définitive' })}
-        <p style="margin:20px 0 0;font-size:12px;color:#64748b;">Ce lien expire dans 1 heure et vous demandera de ressaisir votre mot de passe. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail — rien ne sera supprimé.</p>
+        ${emailButton({ href: params.confirmUrl, label: 'Confirmer la fermeture du compte' })}
+        <p style="margin:20px 0 0;font-size:12px;color:#64748b;">Ce lien expire dans 1 heure et vous demandera de ressaisir votre mot de passe. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.</p>
       `,
     }),
   };

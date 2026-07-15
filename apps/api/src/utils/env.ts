@@ -24,11 +24,9 @@ export const env = {
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY,
   vapidSubject: required('VAPID_SUBJECT', 'mailto:admin@example.com'),
   emailActionSecret: required('EMAIL_ACTION_SECRET', 'changeme-email-action'),
-  smtpHost: process.env.SMTP_HOST,
-  smtpPort: Number(required('SMTP_PORT', '587')),
-  smtpSecure: required('SMTP_SECURE', 'false') === 'true',
-  smtpUser: process.env.SMTP_USER,
-  smtpPassword: process.env.SMTP_PASSWORD,
+  // HTTP-based transactional email (Resend) — SMTP doesn't work from Render, which blocks
+  // outbound connections on mail ports regardless of credentials.
+  resendApiKey: process.env.RESEND_API_KEY,
   emailFrom: required('EMAIL_FROM', 'Banque Familiale <no-reply@example.com>'),
   finnhubApiKey: process.env.FINNHUB_API_KEY,
 };

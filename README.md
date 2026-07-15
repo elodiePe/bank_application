@@ -239,7 +239,12 @@ automatique au déploiement via `prisma migrate deploy`, variables d'environneme
    `WEB_ORIGIN` (l'URL GitHub Pages exacte, pour le CORS), `DATABASE_URL`/`DIRECT_URL` (étape 2
    ci-dessus), `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (générer une paire dédiée à la
    prod avec `npx web-push generate-vapid-keys`, ne jamais réutiliser celle du `.env` de dev),
-   `SMTP_HOST`/`SMTP_USER`/`SMTP_PASSWORD`/`EMAIL_FROM`, et `FINNHUB_API_KEY`.
+   `RESEND_API_KEY`/`EMAIL_FROM`, et `FINNHUB_API_KEY`.
+   L'envoi d'e-mail passe par [Resend](https://resend.com) (API HTTP) plutôt que par du SMTP
+   classique : Render bloque les connexions sortantes sur les ports mail (25/465/587), donc un
+   fournisseur SMTP (Infomaniak, etc.) ne fonctionnera jamais depuis Render, quels que soient les
+   identifiants. Sur Resend : créer un compte, vérifier le domaine d'envoi (`Domains` → ajouter les
+   enregistrements DNS fournis chez l'hébergeur du domaine), puis créer une clé API.
 3. `COOKIE_SECURE=true` est déjà fixé dans le blueprint — indispensable en HTTPS : au-delà du
    flag `Secure`, il fait aussi passer les cookies en `SameSite=None`, requis puisque le frontend
    (GitHub Pages) et l'API (Render) sont sur des domaines différents.
