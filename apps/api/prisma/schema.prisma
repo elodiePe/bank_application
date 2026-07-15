@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -24,6 +25,21 @@ enum TransactionType {
   VALIDATION
   REFUSAL
   CORRECTION
+  STOCK_BUY
+  STOCK_SELL
+  STOCK_GIFT
+}
+
+enum StockOrderType {
+  BUY
+  SELL
+}
+
+enum StockOrderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
 enum TransactionStatus {
@@ -55,25 +71,43 @@ enum NotificationType {
   WITHDRAWAL_PROCESSED
   INTEREST_APPLIED
   CORRECTION_APPLIED
+  STOCK_ORDER_CREATED
+  STOCK_ORDER_APPROVED
+  STOCK_ORDER_REJECTED
+  STOCK_GIFT_RECEIVED
+  CREDENTIAL_RESET_REQUESTED
   GENERIC
 }
 
+/// A family is its own isolated tenant: its own owner login, members, accounts and
+/// history. Nothing is ever shared or visible across families.
 model Family {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// The account used to create/log into this family (distinct from the individual
+  /// PARENT/CHILD member profiles reached afterwards via the "who's logging in?" picker).
+  ownerEmail               String    @unique
+  ownerEmailVerifiedAt     DateTime?
+  ownerPasswordHash        String
+  ownerFailedLoginAttempts Int       @default(0)
+  ownerLockedUntil         DateTime?
+
   users    User[]
   settings Settings?
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   familyId     String
-  family       Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family       Family  @relation(fields: [familyId], references: [id], onDelete: Cascade)
   role         Role
   firstName    String
+  /// Parents only — used as a confirmation step when deactivating a family member, and
+  /// for future account recovery. Not required for children.
+  email        String? @unique
   /// Parents only — bcrypt hash.
   passwordHash String?
   /// Required for children, optional for parents — bcrypt hash of a 4-digit PIN.
@@ -83,42 +117,66 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  /// Soft delete: a deactivated member can no longer log in and is hidden from the login
+  /// picker and "add member" flows, but their transaction history is never deleted —
+  /// consistent with the ledger being immutable everywhere else in this app.
+  deactivatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   childAccount ChildAccount?
 
-  notificationsReceived  Notification[]   @relation("NotificationRecipient")
-  moneyRequestsMade      MoneyRequest[]   @relation("MoneyRequestRequester")
-  moneyRequestsTargeted  MoneyRequest[]   @relation("MoneyRequestTarget")
-  moneyRequestsResponded MoneyRequest[]   @relation("MoneyRequestResponder")
-  transactionsSent       Transaction[]    @relation("TransactionSender")
-  transactionsReceived   Transaction[]    @relation("TransactionReceiver")
-  transactionsValidated  Transaction[]    @relation("TransactionValidator")
-  auditLogs              AuditLog[]       @relation("AuditLogActor")
+  notificationsReceived  Notification[]     @relation("NotificationRecipient")
+  moneyRequestsMade      MoneyRequest[]     @relation("MoneyRequestRequester")
+  moneyRequestsTargeted  MoneyRequest[]     @relation("MoneyRequestTarget")
+  moneyRequestsResponded MoneyRequest[]     @relation("MoneyRequestResponder")
+  transactionsSent       Transaction[]      @relation("TransactionSender")
+  transactionsReceived   Transaction[]      @relation("TransactionReceiver")
+  transactionsValidated  Transaction[]      @relation("TransactionValidator")
+  auditLogs              AuditLog[]         @relation("AuditLogActor")
   refreshSessions        RefreshSession[]
+  pushSubscriptions      PushSubscription[] @relation("PushSubscriptionOwner")
+  stockOrdersMade        StockOrder[]       @relation("StockOrderRequester")
+  stockOrdersResponded   StockOrder[]       @relation("StockOrderResponder")
 
   @@index([familyId])
 }
 
 model ChildAccount {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  balanceCents Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           String @id @default(cuid())
+  userId       String @unique
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balanceCents Int    @default(0)
 
-  transactions    Transaction[]
-  interestHistory InterestHistory[]
+  /// Weekly pocket money, in cents. 0 = disabled for this child.
+  weeklyAllowanceCents  Int       @default(0)
+  /// Set when weeklyAllowanceCents transitions from 0 to a positive value; cleared when
+  /// disabled again. Bounds catch-up processing so enabling this feature on an account with
+  /// years of history doesn't backfill every missed week since account creation.
+  allowanceEnabledSince DateTime?
+
+  /// Set (once, lazily) the first time interestService ever processes this account. Anchors
+  /// which month is the first eligible one, so accounts imported with historical CSV data
+  /// don't get interest backfilled into months the source bank already accounted for.
+  interestEligibleSince DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions     Transaction[]
+  interestHistory  InterestHistory[]
+  allowanceHistory AllowanceHistory[]
+  stockHoldings    StockHolding[]
+  stockOrders      StockOrder[]
 }
 
 model Transaction {
-  id                 String             @id @default(cuid())
+  id                 String            @id @default(cuid())
   accountId          String
-  account            ChildAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account            ChildAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
   type               TransactionType
-  status             TransactionStatus  @default(COMPLETED)
+  status             TransactionStatus @default(COMPLETED)
   amountCents        Int
   balanceBeforeCents Int
   balanceAfterCents  Int
@@ -129,13 +187,13 @@ model Transaction {
   externalRef String? @unique
 
   senderId   String?
-  sender     User?   @relation("TransactionSender", fields: [senderId], references: [id])
+  sender     User?   @relation("TransactionSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiverId String?
-  receiver   User?   @relation("TransactionReceiver", fields: [receiverId], references: [id])
+  receiver   User?   @relation("TransactionReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   /// Parent who validated/performed this operation (null for automated interest).
   validatedById String?
-  validatedBy   User?   @relation("TransactionValidator", fields: [validatedById], references: [id])
+  validatedBy   User?   @relation("TransactionValidator", fields: [validatedById], references: [id], onDelete: Cascade)
 
   /// Links the two legs (debit/credit) of a transfer between two child accounts.
   transferGroupId String?
@@ -154,14 +212,14 @@ model Transaction {
 }
 
 model MoneyRequest {
-  id     String @id @default(cuid())
+  id String @id @default(cuid())
 
   requesterId String
-  requester   User   @relation("MoneyRequestRequester", fields: [requesterId], references: [id])
+  requester   User   @relation("MoneyRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
 
   /// Null when the request targets "the parents" generically rather than one sibling.
   targetUserId String?
-  targetUser   User?   @relation("MoneyRequestTarget", fields: [targetUserId], references: [id])
+  targetUser   User?   @relation("MoneyRequestTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   type   MoneyRequestType
   status MoneyRequestStatus @default(PENDING)
@@ -170,7 +228,7 @@ model MoneyRequest {
   comment     String?
 
   respondedById String?
-  respondedBy   User?     @relation("MoneyRequestResponder", fields: [respondedById], references: [id])
+  respondedBy   User?     @relation("MoneyRequestResponder", fields: [respondedById], references: [id], onDelete: Cascade)
   respondedAt   DateTime?
 
   /// Set once approved, linking to the transaction(s) it produced.
@@ -203,6 +261,21 @@ model Notification {
   @@index([userId, isRead])
 }
 
+/// One row per browser/device the user enabled push notifications on (endpoint is
+/// unique per subscription, so the same user can have several devices).
+model PushSubscription {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation("PushSubscriptionOwner", fields: [userId], references: [id], onDelete: Cascade)
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model InterestHistory {
   id            String       @id @default(cuid())
   accountId     String
@@ -217,10 +290,84 @@ model InterestHistory {
   @@unique([accountId, month])
 }
 
+/// Records each weekly allowance payment so processing is idempotent (never pay the same
+/// week twice) even if the server was offline and catches up on several weeks at once.
+model AllowanceHistory {
+  id            String       @id @default(cuid())
+  accountId     String
+  account       ChildAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// Normalized to the Monday of the week this allowance was paid for.
+  weekStart     DateTime
+  amountCents   Int
+  transactionId String       @unique
+  createdAt     DateTime     @default(now())
+
+  @@unique([accountId, weekStart])
+}
+
+/// A child's current position in one stock symbol. Quantity/average cost are kept as a
+/// running aggregate rather than derived from StockOrder history each time, so reading a
+/// portfolio never needs to replay every past order.
+model StockHolding {
+  id             String       @id @default(cuid())
+  accountId      String
+  account        ChildAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol         String
+  companyName    String
+  quantity       Float
+  /// Average cost per share, in cents — recomputed on every BUY/GIFT; unchanged on SELL.
+  averageCostCents Int
+  /// Set once when the position is opened (first BUY or GIFT); unchanged by later top-ups.
+  /// A position that's fully sold and later reopened gets a fresh date on the new row.
+  firstPurchaseAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, symbol])
+}
+
+/// A child-proposed buy/sell order awaiting parental approval — mirrors MoneyRequest's
+/// propose/approve/reject/cancel lifecycle, but for stock trades instead of cash moves.
+model StockOrder {
+  id String @id @default(cuid())
+
+  requesterId String
+  requester   User   @relation("StockOrderRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   ChildAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  type   StockOrderType
+  status StockOrderStatus @default(PENDING)
+
+  symbol      String
+  companyName String
+  quantity    Float
+  /// Price snapshot at request time, shown to the parent for context — the actual trade
+  /// re-fetches a live quote at approval time rather than trusting this stale value.
+  estimatedPriceCents Int
+  comment             String?
+
+  respondedById String?
+  respondedBy   User?     @relation("StockOrderResponder", fields: [respondedById], references: [id], onDelete: Cascade)
+  respondedAt   DateTime?
+
+  /// Set once approved, linking to the transaction it produced.
+  transactionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requesterId])
+  @@index([accountId])
+  @@index([status])
+}
+
 model Settings {
-  id     String @id @default(cuid())
+  id       String @id @default(cuid())
   familyId String @unique
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   /// Interest rate in basis points (240 = 2.40%).
   defaultInterestRateBps Int    @default(240)
@@ -231,9 +378,9 @@ model Settings {
 }
 
 model AuditLog {
-  id     String @id @default(cuid())
+  id      String @id @default(cuid())
   actorId String
-  actor   User   @relation("AuditLogActor", fields: [actorId], references: [id])
+  actor   User   @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: Cascade)
 
   action     String
   entityType String

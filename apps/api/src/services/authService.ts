@@ -26,7 +26,7 @@ export interface IssuedTokens {
   refreshToken: string;
 }
 
-export type LoginFailureReason = 'not_found' | 'wrong_role' | 'invalid_credential' | 'locked';
+export type LoginFailureReason = 'not_found' | 'wrong_role' | 'invalid_credential' | 'locked' | 'deactivated';
 
 export type LoginResult =
   | { ok: true; user: AuthenticatedUser; tokens: IssuedTokens }
@@ -37,7 +37,13 @@ export type RefreshResult =
   | { ok: false; reason: 'invalid' | 'expired' | 'revoked' };
 
 function toAuthenticatedUser(user: User): AuthenticatedUser {
-  return { id: user.id, familyId: user.familyId, firstName: user.firstName, role: user.role };
+  return {
+    id: user.id,
+    familyId: user.familyId,
+    firstName: user.firstName,
+    role: user.role,
+    email: user.email,
+  };
 }
 
 export function createAuthService(
@@ -68,10 +74,13 @@ export function createAuthService(
     userId: string,
     credential: string,
     strategy: CredentialStrategy,
+    expectedFamilyId: string,
     expectedRole?: PrismaRole,
   ): Promise<LoginResult> {
     const user = await deps.userRepository.findById(userId);
-    if (!user) return { ok: false, reason: 'not_found' };
+    // Wrong family reads as "not found" — never confirm a userId exists in another tenant.
+    if (!user || user.familyId !== expectedFamilyId) return { ok: false, reason: 'not_found' };
+    if (user.deactivatedAt) return { ok: false, reason: 'deactivated' };
     if (expectedRole && user.role !== expectedRole) return { ok: false, reason: 'wrong_role' };
 
     if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
@@ -113,12 +122,12 @@ export function createAuthService(
       }));
     },
 
-    loginWithPassword(userId: string, password: string) {
-      return loginWithStrategy(userId, password, passwordStrategy, 'PARENT');
+    loginWithPassword(userId: string, password: string, familyId: string) {
+      return loginWithStrategy(userId, password, passwordStrategy, familyId, 'PARENT');
     },
 
-    loginWithPin(userId: string, pin: string) {
-      return loginWithStrategy(userId, pin, pinStrategy);
+    loginWithPin(userId: string, pin: string, familyId: string) {
+      return loginWithStrategy(userId, pin, pinStrategy, familyId);
     },
 
     async refresh(refreshToken: string): Promise<RefreshResult> {

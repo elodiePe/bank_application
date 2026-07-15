@@ -1,13 +1,20 @@
 import { motion } from 'framer-motion';
 import type { TransactionSummary } from '@banque-familiale/shared';
-import { formatChf } from '../utils/currency.js';
+import { formatMoney } from '../utils/currency.js';
 import { TRANSACTION_TYPE_LABELS, transactionSign } from '../utils/transactionLabels.js';
+import { useCurrency } from '../hooks/useTransactionActions.js';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export function RecentTransactionsList({ transactions }: { transactions: TransactionSummary[] }) {
+interface RecentTransactionsListProps {
+  transactions: TransactionSummary[];
+  onCorrect?: (transaction: TransactionSummary) => void;
+}
+
+export function RecentTransactionsList({ transactions, onCorrect }: RecentTransactionsListProps) {
+  const currency = useCurrency();
   if (transactions.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
@@ -19,7 +26,7 @@ export function RecentTransactionsList({ transactions }: { transactions: Transac
   return (
     <ul className="flex flex-col gap-2">
       {transactions.map((t, index) => {
-        const sign = transactionSign(t.type);
+        const sign = transactionSign(t);
         return (
           <motion.li
             key={t.id}
@@ -36,18 +43,29 @@ export function RecentTransactionsList({ transactions }: { transactions: Transac
                 {t.comment ?? '—'} · {formatDate(t.occurredAt)}
               </p>
             </div>
-            <span
-              className={
-                sign > 0
-                  ? 'font-semibold text-emerald-600 dark:text-emerald-400'
-                  : sign < 0
-                    ? 'font-semibold text-red-600 dark:text-red-400'
-                    : 'font-semibold text-slate-600 dark:text-slate-400'
-              }
-            >
-              {sign > 0 ? '+' : sign < 0 ? '−' : ''}
-              {formatChf(t.amountCents)}
-            </span>
+            <div className="flex items-center gap-3">
+              <span
+                className={
+                  sign > 0
+                    ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+                    : sign < 0
+                      ? 'font-semibold text-red-600 dark:text-red-400'
+                      : 'font-semibold text-slate-600 dark:text-slate-400'
+                }
+              >
+                {sign > 0 ? '+' : sign < 0 ? '−' : ''}
+                {formatMoney(t.amountCents, currency)}
+              </span>
+              {onCorrect && t.isReversible && (
+                <button
+                  type="button"
+                  onClick={() => onCorrect(t)}
+                  className="text-xs text-slate-400 hover:text-brand-600 hover:underline dark:hover:text-brand-400"
+                >
+                  Corriger
+                </button>
+              )}
+            </div>
           </motion.li>
         );
       })}

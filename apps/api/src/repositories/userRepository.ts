@@ -6,10 +6,32 @@ export function createUserRepository(prisma: PrismaClient) {
       return prisma.user.findUnique({ where: { id: userId } });
     },
 
+    findByEmail(email: string) {
+      return prisma.user.findUnique({ where: { email } });
+    },
+
+    /** Active members only — used for the public login picker. */
     listFamilyMembers(familyId: string) {
       return prisma.user.findMany({
-        where: { familyId },
+        where: { familyId, deactivatedAt: null },
         select: { id: true, firstName: true, role: true, pinHash: true },
+        orderBy: { createdAt: 'asc' },
+      });
+    },
+
+    /** Everyone, including deactivated members — used by the family management panel. */
+    listAllFamilyMembers(familyId: string) {
+      return prisma.user.findMany({
+        where: { familyId },
+        select: {
+          id: true,
+          firstName: true,
+          role: true,
+          email: true,
+          pinHash: true,
+          passwordHash: true,
+          deactivatedAt: true,
+        },
         orderBy: { createdAt: 'asc' },
       });
     },
@@ -35,6 +57,22 @@ export function createUserRepository(prisma: PrismaClient) {
         where: { id: userId },
         data: { failedLoginAttempts: 0, lockedUntil: null },
       });
+    },
+
+    setEmail(userId: string, email: string) {
+      return prisma.user.update({ where: { id: userId }, data: { email } });
+    },
+
+    setPasswordHash(userId: string, passwordHash: string) {
+      return prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    },
+
+    setPinHash(userId: string, pinHash: string) {
+      return prisma.user.update({ where: { id: userId }, data: { pinHash } });
+    },
+
+    deactivate(userId: string) {
+      return prisma.user.update({ where: { id: userId }, data: { deactivatedAt: new Date() } });
     },
   };
 }

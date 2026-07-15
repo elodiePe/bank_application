@@ -12,3 +12,16 @@ export const loginRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'TOO_MANY_ATTEMPTS' },
 });
+
+/**
+ * Family owner registration/login is the outermost gate and the first thing any
+ * stranger who finds the URL will try to brute-force — throttle it harder than
+ * per-account member login.
+ */
+export const familyAuthRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'TOO_MANY_ATTEMPTS' },
+});

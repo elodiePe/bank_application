@@ -3,19 +3,18 @@ import { loginPasswordSchema, loginPinSchema } from '@banque-familiale/shared';
 import type { AuthService } from '../services/authService.js';
 import { setAuthCookies, clearAuthCookies, REFRESH_COOKIE_NAME } from '../utils/cookies.js';
 
-const DEMO_FAMILY_ID = 'demo-family';
-
 const FAILURE_STATUS: Record<string, number> = {
   not_found: 401,
   wrong_role: 401,
   invalid_credential: 401,
   locked: 423,
+  deactivated: 403,
 };
 
 export function createAuthController(authService: AuthService) {
   return {
-    async listMembers(_req: Request, res: Response) {
-      const members = await authService.listFamilyMembers(DEMO_FAMILY_ID);
+    async listMembers(req: Request, res: Response) {
+      const members = await authService.listFamilyMembers(req.familyOwner!.familyId);
       res.json(members);
     },
 
@@ -26,7 +25,11 @@ export function createAuthController(authService: AuthService) {
         return;
       }
 
-      const result = await authService.loginWithPassword(parsed.data.userId, parsed.data.password);
+      const result = await authService.loginWithPassword(
+        parsed.data.userId,
+        parsed.data.password,
+        req.familyOwner!.familyId,
+      );
       if (!result.ok) {
         res.status(FAILURE_STATUS[result.reason] ?? 401).json({ error: result.reason.toUpperCase() });
         return;
@@ -43,7 +46,11 @@ export function createAuthController(authService: AuthService) {
         return;
       }
 
-      const result = await authService.loginWithPin(parsed.data.userId, parsed.data.pin);
+      const result = await authService.loginWithPin(
+        parsed.data.userId,
+        parsed.data.pin,
+        req.familyOwner!.familyId,
+      );
       if (!result.ok) {
         res.status(FAILURE_STATUS[result.reason] ?? 401).json({ error: result.reason.toUpperCase() });
         return;
