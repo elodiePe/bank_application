@@ -20,6 +20,13 @@ import { errorHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
+  // Render (like most hosts) puts the app behind a reverse proxy, so every request's
+  // socket address is the proxy's, not the real client's. Without this, express-rate-limit
+  // sees every visitor as the same IP and one family's failed attempts locks out everyone
+  // else's forms too. `1` trusts exactly one hop (the platform's own proxy) and reads the
+  // real client IP from X-Forwarded-For, which is what req.ip and rate-limit keying use.
+  app.set('trust proxy', 1);
+
   app.use(helmet());
   app.use(cors({ origin: env.webOrigin, credentials: true }));
   app.use(express.json());
