@@ -226,7 +226,7 @@ export function createMemberService(prisma: PrismaClient) {
       const resetToken = signMemberActionToken({ userId: target.id, action: 'reset-password' });
       const { subject, html } = resetMemberPasswordRequestTemplate({
         firstName: target.firstName,
-        resetUrl: `${env.webOrigin}/reset-password?type=member&token=${resetToken}`,
+        resetUrl: `${env.webAppUrl}/reset-password?type=member&token=${resetToken}`,
       });
       await sendEmail({ to: target.email, subject, html });
     },

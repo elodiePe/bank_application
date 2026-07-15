@@ -19,6 +19,8 @@ services:
         value: true
       - key: WEB_ORIGIN
         sync: false
+      - key: WEB_APP_URL
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL

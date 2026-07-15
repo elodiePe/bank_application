@@ -62,7 +62,7 @@ export function createFamilyAuthService(prisma: PrismaClient) {
       });
       const { subject, html } = verifyEmailTemplate({
         familyName: family.name,
-        verifyUrl: `${env.webOrigin}/verify-email?token=${verifyToken}`,
+        verifyUrl: `${env.webAppUrl}/verify-email?token=${verifyToken}`,
       });
       void sendEmail({ to: family.ownerEmail, subject, html });
 
@@ -124,7 +124,7 @@ export function createFamilyAuthService(prisma: PrismaClient) {
       });
       const { subject, html } = deleteAccountRequestTemplate({
         familyName: family.name,
-        confirmUrl: `${env.webOrigin}/delete-family?token=${deleteToken}`,
+        confirmUrl: `${env.webAppUrl}/delete-family?token=${deleteToken}`,
       });
       await sendEmail({ to: family.ownerEmail, subject, html });
     },
@@ -161,7 +161,7 @@ export function createFamilyAuthService(prisma: PrismaClient) {
       });
       const { subject, html } = resetPasswordRequestTemplate({
         familyName: family.name,
-        resetUrl: `${env.webOrigin}/reset-password?type=family&token=${resetToken}`,
+        resetUrl: `${env.webAppUrl}/reset-password?type=family&token=${resetToken}`,
       });
       await sendEmail({ to: family.ownerEmail, subject, html });
     },

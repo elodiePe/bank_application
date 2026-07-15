@@ -236,7 +236,11 @@ automatique au déploiement via `prisma migrate deploy`, variables d'environneme
 1. Sur [render.com](https://render.com) : **New → Blueprint**, connecter ce dépôt GitHub — Render
    détecte `render.yaml` automatiquement.
 2. Renseigner les variables marquées `sync: false` dans le blueprint (non générées automatiquement) :
-   `WEB_ORIGIN` (l'URL GitHub Pages exacte, pour le CORS), `DATABASE_URL`/`DIRECT_URL` (étape 2
+   `WEB_ORIGIN` (l'URL GitHub Pages exacte, **sans** sous-chemin ni slash final — utilisée
+   uniquement pour le CORS, qui compare l'origine au caractère près), `WEB_APP_URL` (la même URL
+   mais **avec** le sous-chemin, ex. `https://username.github.io/bank_application` — c'est celle-ci
+   qui sert à construire les liens dans les e-mails ; une page GitHub Pages de type projet est
+   servie depuis un sous-chemin, pas la racine du domaine), `DATABASE_URL`/`DIRECT_URL` (étape 2
    ci-dessus), `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (générer une paire dédiée à la
    prod avec `npx web-push generate-vapid-keys`, ne jamais réutiliser celle du `.env` de dev),
    `RESEND_API_KEY`/`EMAIL_FROM`, et `FINNHUB_API_KEY`.

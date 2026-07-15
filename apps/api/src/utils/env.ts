@@ -11,7 +11,13 @@ function required(name: string, fallback?: string): string {
 export const env = {
   port: Number(required('API_PORT', '4000')),
   nodeEnv: required('NODE_ENV', 'development'),
+  // Exact origin only (no path) — required for CORS, which compares scheme+host+port
+  // verbatim, and would silently reject every request if a sub-path were appended here.
   webOrigin: required('WEB_ORIGIN', 'http://localhost:5173'),
+  // Where the web app actually lives, including any sub-path — GitHub Pages project sites
+  // are served from /<repo-name>/, not the domain root. Used to build links inside emails.
+  // Falls back to webOrigin so local dev (served from the domain root) needs no extra config.
+  webAppUrl: (process.env.WEB_APP_URL ?? process.env.WEB_ORIGIN ?? 'http://localhost:5173').replace(/\/+$/, ''),
   jwtAccessSecret: required('JWT_ACCESS_SECRET'),
   jwtRefreshSecret: required('JWT_REFRESH_SECRET'),
   jwtAccessTtlSeconds: Number(required('JWT_ACCESS_TTL_SECONDS', '900')),
