@@ -54,16 +54,23 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-      data: { url: payload.url ?? '/' },
+      // No leading slash — resolved relative to the SW's own script location, which
+      // already sits at the deployed base path (e.g. /bank_application/ on GitHub
+      // Pages). A leading slash would instead resolve to the domain root and 404.
+      icon: 'icons/icon-192.png',
+      badge: 'icons/icon-192.png',
+      data: { url: payload.url },
     }),
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data as { url?: string } | undefined)?.url ?? '/';
+  // registration.scope already includes the deployed base path (e.g.
+  // https://elodiepe.github.io/bank_application/) — resolving against it, rather than
+  // against the bare origin, is what keeps this correct under a GitHub Pages sub-path.
+  const requested = (event.notification.data as { url?: string } | undefined)?.url;
+  const targetUrl = new URL(requested ?? '.', self.registration.scope).href;
 
   event.waitUntil(
     (async () => {
