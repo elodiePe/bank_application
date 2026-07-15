@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import type {
   CreateStockOrderInput,
   GiftStockInput,
+  StockLotSummary,
   StockOrderSummary,
   StockPortfolioOverview,
   StockQuote,
@@ -111,6 +112,41 @@ export function createStockService(prisma: PrismaClient) {
     return { holdings: summaries, totalMarketValueCents, totalCostCents };
   }
 
+  const LOT_TYPE: Record<string, StockLotSummary['type']> = {
+    STOCK_BUY: 'BUY',
+    STOCK_SELL: 'SELL',
+    STOCK_GIFT: 'GIFT',
+  };
+
+  async function getLotsForAccount(accountId: string, symbol: string): Promise<StockLotSummary[]> {
+    const rows = await stockRepo.listLotsForSymbol(accountId, symbol);
+
+    // A SELL lot needs no live price (it's a completed, closed event); a BUY/GIFT lot's
+    // gain/loss needs the current quote — fetch it once, reused for every such row.
+    const needsQuote = rows.some((r) => r.type !== 'STOCK_SELL');
+    const currentPriceCents = needsQuote ? await priceService.getQuote(symbol).then((q) => q.currentPriceCents).catch(() => null) : null;
+
+    return rows.map((r) => {
+      const quantity = r.stockQuantity ?? 0;
+      const pricePerShareCents = quantity > 0 ? Math.round(r.amountCents / quantity) : 0;
+      const isClosedSale = r.type === 'STOCK_SELL';
+      const gainLossCents =
+        !isClosedSale && currentPriceCents !== null ? Math.round((currentPriceCents - pricePerShareCents) * quantity) : null;
+
+      return {
+        id: r.id,
+        type: LOT_TYPE[r.type] ?? 'BUY',
+        occurredAt: r.occurredAt.toISOString(),
+        quantity,
+        pricePerShareCents,
+        totalCents: r.amountCents,
+        gainLossCents,
+        gainLossPercent: gainLossCents !== null && r.amountCents > 0 ? (gainLossCents / r.amountCents) * 100 : null,
+        comment: r.comment,
+      };
+    });
+  }
+
   return {
     search(query: string): Promise<StockSearchResult[]> {
       return priceService.search(query);
@@ -132,6 +168,20 @@ export function createStockService(prisma: PrismaClient) {
         throw new ForbiddenError("Ce compte n'appartient pas à votre famille");
       }
       return getPortfolioForAccount(accountId);
+    },
+
+    async getLots(userId: string, symbol: string): Promise<StockLotSummary[]> {
+      const account = await accountRepo.findByUserId(userId);
+      if (!account) throw new NotFoundError('Compte introuvable');
+      return getLotsForAccount(account.id, symbol.toUpperCase());
+    },
+
+    async getLotsForFamilyAccount(accountId: string, symbol: string, familyId: string): Promise<StockLotSummary[]> {
+      const account = await accountRepo.findByIdOrThrow(accountId);
+      if (account.user.familyId !== familyId) {
+        throw new ForbiddenError("Ce compte n'appartient pas à votre famille");
+      }
+      return getLotsForAccount(accountId, symbol.toUpperCase());
     },
 
     async createOrder(params: {
@@ -213,6 +263,8 @@ export function createStockService(prisma: PrismaClient) {
             balanceBeforeCents: account.balanceCents,
             balanceAfterCents: balanceAfter,
             comment: `Achat de ${order.quantity} ${order.symbol}`,
+            stockSymbol: order.symbol,
+            stockQuantity: order.quantity,
             validatedBy: { connect: { id: params.actorId } },
             occurredAt: new Date(),
           });
@@ -239,6 +291,8 @@ export function createStockService(prisma: PrismaClient) {
             balanceBeforeCents: account.balanceCents,
             balanceAfterCents: balanceAfter,
             comment: `Vente de ${order.quantity} ${order.symbol}`,
+            stockSymbol: order.symbol,
+            stockQuantity: order.quantity,
             validatedBy: { connect: { id: params.actorId } },
             occurredAt: new Date(),
           });
@@ -319,6 +373,8 @@ export function createStockService(prisma: PrismaClient) {
           balanceBeforeCents: account.balanceCents,
           balanceAfterCents: account.balanceCents,
           comment: params.input.comment ?? `Cadeau de ${params.input.quantity} ${quote.symbol}`,
+          stockSymbol: quote.symbol,
+          stockQuantity: params.input.quantity,
           validatedBy: { connect: { id: params.actorId } },
           occurredAt: new Date(),
         });

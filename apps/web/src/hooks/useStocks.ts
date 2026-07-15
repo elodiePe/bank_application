@@ -5,7 +5,9 @@ import {
   cancelStockOrder,
   createStockOrder,
   fetchChildPortfolio,
+  fetchChildStockLots,
   fetchMyPortfolio,
+  fetchMyStockLots,
   fetchMyStockOrders,
   fetchPendingStockOrders,
   fetchStockQuote,
@@ -50,6 +52,24 @@ export function useChildPortfolio(accountId: string | null) {
     queryKey: ['stock-portfolio', accountId],
     queryFn: () => fetchChildPortfolio(accountId!),
     enabled: accountId !== null,
+    staleTime: 15_000,
+  });
+}
+
+export function useMyStockLots(symbol: string | null) {
+  return useQuery({
+    queryKey: ['stock-lots', 'mine', symbol],
+    queryFn: () => fetchMyStockLots(symbol!),
+    enabled: symbol !== null,
+    staleTime: 15_000,
+  });
+}
+
+export function useChildStockLots(accountId: string | null, symbol: string | null) {
+  return useQuery({
+    queryKey: ['stock-lots', accountId, symbol],
+    queryFn: () => fetchChildStockLots(accountId!, symbol!),
+    enabled: accountId !== null && symbol !== null,
     staleTime: 15_000,
   });
 }

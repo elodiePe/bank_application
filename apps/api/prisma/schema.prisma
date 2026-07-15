@@ -182,6 +182,11 @@ model Transaction {
   balanceAfterCents  Int
   comment            String?
 
+  /// Set only for STOCK_BUY/STOCK_SELL/STOCK_GIFT — lets a holding's individual lots be
+  /// queried directly instead of parsed out of the free-text comment.
+  stockSymbol   String?
+  stockQuantity Float?
+
   /// Stable identifier for rows imported from an external source (e.g. a CSV history
   /// file) so re-running an import never creates duplicates.
   externalRef String? @unique

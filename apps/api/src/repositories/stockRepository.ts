@@ -92,6 +92,19 @@ export function createStockRepository(prisma: Db) {
         orderBy: { createdAt: 'desc' },
       });
     },
+
+    /** Every individual lot (buy/sell/gift) behind a holding's current aggregate
+     * quantity/cost — oldest first, so a running position can be traced chronologically. */
+    listLotsForSymbol(accountId: string, symbol: string) {
+      return prisma.transaction.findMany({
+        where: {
+          accountId,
+          stockSymbol: symbol,
+          type: { in: ['STOCK_BUY', 'STOCK_SELL', 'STOCK_GIFT'] },
+        },
+        orderBy: { occurredAt: 'asc' },
+      });
+    },
   };
 }
 

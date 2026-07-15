@@ -1,6 +1,7 @@
 import type {
   CreateStockOrderInput,
   GiftStockInput,
+  StockLotSummary,
   StockOrderSummary,
   StockPortfolioOverview,
   StockQuote,
@@ -22,6 +23,14 @@ export function fetchMyPortfolio(): Promise<StockPortfolioOverview> {
 
 export function fetchChildPortfolio(accountId: string): Promise<StockPortfolioOverview> {
   return apiGet<StockPortfolioOverview>(`/stocks/portfolio/${accountId}`);
+}
+
+export function fetchMyStockLots(symbol: string): Promise<StockLotSummary[]> {
+  return apiGet<StockLotSummary[]>(`/stocks/lots/${encodeURIComponent(symbol)}`);
+}
+
+export function fetchChildStockLots(accountId: string, symbol: string): Promise<StockLotSummary[]> {
+  return apiGet<StockLotSummary[]>(`/stocks/lots/${accountId}/${encodeURIComponent(symbol)}`);
 }
 
 export function createStockOrder(input: CreateStockOrderInput): Promise<StockOrderSummary> {

@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from './Modal.js';
 import { useCreateStockOrder, useStockQuote, useStockSearch } from '../hooks/useStocks.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
 import { formatMoney } from '../utils/currency.js';
 import { ApiError } from '../services/api.js';
 
@@ -14,6 +13,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   EXTERNAL_SERVICE_ERROR: 'Service de cours boursiers indisponible pour le moment.',
   INVALID_INPUT: "Tu ne possèdes pas assez de cette action pour la vendre.",
 };
+
+// Stock prices come straight from Finnhub, always in USD — never the family's configured
+// display currency, and formatMoney doesn't convert, only relabels, so this must stay fixed.
+const STOCK_CURRENCY = 'USD';
 
 const formSchema = z.object({
   quantity: z.coerce.number().positive('La quantité doit être positive'),
@@ -42,7 +45,6 @@ export function StockOrderModal({ mode, initialSymbol, initialCompanyName, onClo
 
   const search = useStockSearch(selected ? '' : debouncedQuery);
   const quote = useStockQuote(selected?.symbol ?? null);
-  const currency = useCurrency();
   const createOrder = useCreateStockOrder();
 
   const {
@@ -118,7 +120,7 @@ export function StockOrderModal({ mode, initialSymbol, initialCompanyName, onClo
               )}
               {quote.data && (
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Cours actuel : {formatMoney(quote.data.currentPriceCents, currency)}
+                  Cours actuel : {formatMoney(quote.data.currentPriceCents, STOCK_CURRENCY)}
                 </p>
               )}
               {quote.isError && (

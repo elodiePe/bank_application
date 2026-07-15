@@ -33,6 +33,20 @@ export function createStockController(stockService: StockService) {
       res.json(portfolio);
     },
 
+    async getMyLots(req: Request, res: Response) {
+      const lots = await stockService.getLots(req.auth!.sub, String(req.params.symbol));
+      res.json(lots);
+    },
+
+    async getChildLots(req: Request, res: Response) {
+      const lots = await stockService.getLotsForFamilyAccount(
+        String(req.params.accountId),
+        String(req.params.symbol),
+        req.auth!.familyId,
+      );
+      res.json(lots);
+    },
+
     async createOrder(req: Request, res: Response) {
       const parsed = createStockOrderSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.message);

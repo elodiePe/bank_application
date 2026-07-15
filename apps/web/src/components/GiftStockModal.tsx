@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from './Modal.js';
 import { useChildPortfolio, useGiftStock, useStockQuote, useStockSearch } from '../hooks/useStocks.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
 import { formatMoney } from '../utils/currency.js';
 import { ApiError } from '../services/api.js';
 
@@ -12,6 +11,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   NOT_FOUND: 'Symbole introuvable.',
   EXTERNAL_SERVICE_ERROR: 'Service de cours boursiers indisponible pour le moment.',
 };
+
+// Stock prices come straight from Finnhub, always in USD — never the family's configured
+// display currency, and formatMoney doesn't convert, only relabels, so this must stay fixed.
+const STOCK_CURRENCY = 'USD';
 
 const formSchema = z.object({
   quantity: z.coerce.number().positive('La quantité doit être positive'),
@@ -38,7 +41,6 @@ export function GiftStockModal({ accountId, childFirstName, onClose }: GiftStock
   const search = useStockSearch(selected ? '' : debouncedQuery);
   const quote = useStockQuote(selected?.symbol ?? null);
   const portfolio = useChildPortfolio(accountId);
-  const currency = useCurrency();
   const giftStock = useGiftStock();
 
   const {
@@ -132,7 +134,7 @@ export function GiftStockModal({ accountId, childFirstName, onClose }: GiftStock
               )}
               {quote.data && (
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Cours actuel : {formatMoney(quote.data.currentPriceCents, currency)}
+                  Cours actuel : {formatMoney(quote.data.currentPriceCents, STOCK_CURRENCY)}
                 </p>
               )}
               {quote.isError && (

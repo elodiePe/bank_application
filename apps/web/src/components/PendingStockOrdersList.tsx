@@ -1,12 +1,14 @@
 import { useApproveStockOrder, usePendingStockOrders, useRejectStockOrder } from '../hooks/useStocks.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
 import { formatMoney } from '../utils/currency.js';
+
+// Stock prices come straight from Finnhub, always in USD — never the family's configured
+// display currency, and formatMoney doesn't convert, only relabels, so this must stay fixed.
+const STOCK_CURRENCY = 'USD';
 
 export function PendingStockOrdersList() {
   const pending = usePendingStockOrders();
   const approve = useApproveStockOrder();
   const reject = useRejectStockOrder();
-  const currency = useCurrency();
 
   if (!pending.data || pending.data.length === 0) return null;
 
@@ -24,7 +26,7 @@ export function PendingStockOrdersList() {
                 {o.childFirstName} veut {o.type === 'BUY' ? 'acheter' : 'vendre'} {o.quantity} {o.symbol}
               </p>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {o.companyName} · ~{formatMoney(o.estimatedPriceCents * o.quantity, currency)}
+                {o.companyName} · ~{formatMoney(o.estimatedPriceCents * o.quantity, STOCK_CURRENCY)}
                 {o.comment ? ` · ${o.comment}` : ''}
               </p>
             </div>

@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useMyPortfolio } from '../hooks/useStocks.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
 import { formatMoney } from '../utils/currency.js';
+
+// Stock prices come straight from Finnhub, always in USD — never the family's configured
+// display currency, and formatMoney doesn't convert, only relabels, so this must stay fixed.
+const STOCK_CURRENCY = 'USD';
 
 /** Compact summary on the dashboard — the full breakdown lives on its own page. */
 export function PortfolioTeaser() {
   const portfolio = useMyPortfolio();
-  const currency = useCurrency();
 
   const totalValue = portfolio.data?.totalMarketValueCents ?? 0;
   const totalCost = portfolio.data?.totalCostCents ?? 0;
@@ -32,7 +34,7 @@ export function PortfolioTeaser() {
         {!portfolio.isLoading && holdingsCount > 0 && (
           <>
             <div>
-              <p className="text-2xl font-bold">{formatMoney(totalValue, currency)}</p>
+              <p className="text-2xl font-bold">{formatMoney(totalValue, STOCK_CURRENCY)}</p>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 {holdingsCount} position{holdingsCount > 1 ? 's' : ''}
               </p>
@@ -46,7 +48,7 @@ export function PortfolioTeaser() {
                 }
               >
                 {gain >= 0 ? '+' : ''}
-                {formatMoney(gain, currency)}
+                {formatMoney(gain, STOCK_CURRENCY)}
               </span>
             )}
           </>

@@ -28,6 +28,16 @@ export function createStockRouter(prisma: PrismaClient) {
     requireRole('PARENT'),
     asyncHandler((req, res) => controller.getChildPortfolio(req, res)),
   );
+  router.get(
+    '/lots/:symbol',
+    requireRole('CHILD'),
+    asyncHandler((req, res) => controller.getMyLots(req, res)),
+  );
+  router.get(
+    '/lots/:accountId/:symbol',
+    requireRole('PARENT'),
+    asyncHandler((req, res) => controller.getChildLots(req, res)),
+  );
 
   router.post(
     '/orders',

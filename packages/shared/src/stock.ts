@@ -37,6 +37,20 @@ export interface StockPortfolioOverview {
   totalCostCents: number;
 }
 
+/** One individual buy/sell/gift behind a holding's current aggregate position. */
+export interface StockLotSummary {
+  id: string;
+  type: 'BUY' | 'SELL' | 'GIFT';
+  occurredAt: string;
+  quantity: number;
+  pricePerShareCents: number;
+  totalCents: number;
+  /** Null for SELL lots — a completed sale isn't compared against the current price. */
+  gainLossCents: number | null;
+  gainLossPercent: number | null;
+  comment: string | null;
+}
+
 export interface StockOrderSummary {
   id: string;
   requesterId: string;
