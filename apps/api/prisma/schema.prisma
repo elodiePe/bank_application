@@ -141,6 +141,9 @@ model User {
   stockOrdersResponded   StockOrder[]       @relation("StockOrderResponder")
 
   @@index([familyId])
+  /// Covers the login-picker query (active members of a family), run on every family
+  /// login screen load.
+  @@index([familyId, deactivatedAt])
 }
 
 model ChildAccount {
@@ -214,6 +217,12 @@ model Transaction {
   @@index([accountId])
   @@index([transferGroupId])
   @@index([occurredAt])
+  /// Covers the per-account history query (a child's or family's transaction list,
+  /// paginated newest-first) without a separate sort step.
+  @@index([accountId, occurredAt])
+  /// Covers looking up a stock holding's individual lots (buy/sell/gift rows for one
+  /// symbol in one account).
+  @@index([accountId, stockSymbol])
 }
 
 model MoneyRequest {
