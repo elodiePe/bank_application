@@ -31,7 +31,7 @@ export function UpdatePrompt() {
           <span>
             {needRefresh
               ? 'Une nouvelle version est disponible.'
-              : "L'application est prête pour une utilisation hors ligne."}
+              : "Ceci est la dernière version de l'application."}
           </span>
           <div className="flex shrink-0 gap-2">
             {needRefresh && (
