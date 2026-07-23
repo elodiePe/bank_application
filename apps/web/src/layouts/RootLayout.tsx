@@ -3,6 +3,7 @@ import { useTheme } from '../hooks/useTheme.js';
 import { useCurrentUser } from '../hooks/useAuth.js';
 import { useLogout } from '../hooks/useLogout.js';
 import { NotificationBell } from '../components/NotificationBell.js';
+import { HeaderOverflowMenu } from '../components/HeaderOverflowMenu.js';
 
 export function RootLayout() {
   const { theme, toggleTheme } = useTheme();
@@ -20,28 +21,24 @@ export function RootLayout() {
         </Link>
         <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           {user && <NotificationBell />}
+
+          {/* Desktop: individual labeled buttons. */}
           {user && (
             <Link
               to="/settings"
               aria-label="Paramètres"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 text-sm hover:bg-slate-100 sm:h-auto sm:w-auto sm:px-3 sm:py-1 dark:border-slate-700 dark:hover:bg-slate-900"
+              className="hidden items-center rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 sm:flex dark:border-slate-700 dark:hover:bg-slate-900"
             >
-              <span aria-hidden className="sm:hidden">
-                ⚙️
-              </span>
-              <span className="hidden sm:inline">Paramètres</span>
+              Paramètres
             </Link>
           )}
           <button
             type="button"
             onClick={toggleTheme}
             aria-label={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 text-sm hover:bg-slate-100 sm:h-auto sm:w-auto sm:px-3 sm:py-1 dark:border-slate-700 dark:hover:bg-slate-900"
+            className="hidden items-center rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 sm:flex dark:border-slate-700 dark:hover:bg-slate-900"
           >
-            <span aria-hidden className="sm:hidden">
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </span>
-            <span className="hidden sm:inline">{theme === 'dark' ? 'Mode clair' : 'Mode sombre'}</span>
+            {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
           </button>
           {user && (
             <button
@@ -49,14 +46,21 @@ export function RootLayout() {
               onClick={() => logout.mutate()}
               disabled={logout.isPending}
               aria-label="Déconnexion"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 text-sm hover:bg-slate-100 disabled:opacity-60 sm:h-auto sm:w-auto sm:px-3 sm:py-1 dark:border-slate-700 dark:hover:bg-slate-900"
+              className="hidden items-center rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-60 sm:flex dark:border-slate-700 dark:hover:bg-slate-900"
             >
-              <span aria-hidden className="sm:hidden">
-                🚪
-              </span>
-              <span className="hidden sm:inline">Déconnexion</span>
+              Déconnexion
             </button>
           )}
+
+          {/* Mobile: collapsed into a single overflow menu. */}
+          <div className="sm:hidden">
+            <HeaderOverflowMenu
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              onLogout={() => logout.mutate()}
+              logoutPending={logout.isPending}
+            />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10">

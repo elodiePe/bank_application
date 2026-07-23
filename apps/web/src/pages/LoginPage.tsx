@@ -106,22 +106,22 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-8 px-6">
+    <div className="relative mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-8 px-6">
+      {!selected && (
+        <button
+          type="button"
+          onClick={() => logoutFamily.mutate(undefined, { onSuccess: () => navigate('/', { replace: true }) })}
+          disabled={logoutFamily.isPending}
+          className="absolute right-4 top-4 text-xs text-slate-400 hover:text-red-600 hover:underline disabled:opacity-60 dark:text-slate-500 dark:hover:text-red-400"
+        >
+          Se déconnecter
+        </button>
+      )}
       <div className="text-center">
         <h1 className="text-2xl font-bold text-brand-600 dark:text-brand-400">Banque Familiale</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           {selected ? `Bonjour ${selected.firstName}` : 'Qui se connecte ?'}
         </p>
-        {!selected && (
-          <button
-            type="button"
-            onClick={() => logoutFamily.mutate(undefined, { onSuccess: () => navigate('/', { replace: true }) })}
-            disabled={logoutFamily.isPending}
-            className="mt-2 text-xs text-slate-400 hover:text-red-600 hover:underline disabled:opacity-60 dark:text-slate-500 dark:hover:text-red-400"
-          >
-            Se déconnecter
-          </button>
-        )}
       </div>
 
       <AnimatePresence mode="wait">
