@@ -28,11 +28,11 @@ export function UpdatePrompt() {
           exit={{ opacity: 0, y: 20 }}
           className="fixed bottom-4 left-1/2 z-50 flex w-[92%] max-w-sm -translate-x-1/2 items-center justify-between gap-3 rounded-xl bg-slate-900 px-4 py-3 text-sm text-white shadow-lg dark:bg-slate-800"
         >
-          <span>
+          {/* <span>
             {needRefresh
               ? 'Une nouvelle version est disponible.'
               : "Ceci est la dernière version de l'application."}
-          </span>
+          </span> */}
           <div className="flex shrink-0 gap-2">
             {needRefresh && (
               <button
