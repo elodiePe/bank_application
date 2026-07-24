@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ParentDashboardOverview } from '@banque-familiale/shared';
 import {
+  completeOnboarding,
   fetchChildOverview,
   fetchMyTransactions,
   fetchParentOverview,
@@ -12,6 +14,23 @@ export function useParentOverview(enabled = true) {
     queryFn: fetchParentOverview,
     staleTime: 30_000,
     enabled,
+  });
+}
+
+export function useCompleteOnboarding() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: completeOnboarding,
+    onSuccess: () => {
+      // Patch the cache directly instead of just invalidating: the dashboard route (which
+      // gates on this exact flag) mounts and reads the cache synchronously right after this
+      // resolves, before an invalidation-triggered refetch would have landed — that race
+      // was bouncing straight back into the wizard even though the flag was already saved.
+      queryClient.setQueryData<ParentDashboardOverview>(['dashboard', 'overview'], (old) =>
+        old ? { ...old, onboardingCompleted: true } : old,
+      );
+      return queryClient.invalidateQueries({ queryKey: ['dashboard', 'overview'] });
+    },
   });
 }
 

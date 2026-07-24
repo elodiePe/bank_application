@@ -63,6 +63,18 @@ function EmailForm({
     defaultValues: { email: defaultEmail },
   });
 
+  if (currentEmail) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium">Adresse e-mail</span>
+        <span className="text-sm text-slate-600 dark:text-slate-400">{currentEmail}</span>
+        <span className="text-xs text-slate-400 dark:text-slate-500">
+          Ne peut plus être modifiée une fois définie.
+        </span>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit((values) => setEmail.mutate(values))} className="flex flex-col gap-2">
       <label className="text-sm font-medium" htmlFor="email">

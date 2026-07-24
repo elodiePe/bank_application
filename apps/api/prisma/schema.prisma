@@ -95,6 +95,10 @@ model Family {
   ownerFailedLoginAttempts Int       @default(0)
   ownerLockedUntil         DateTime?
 
+  /// Set once the first parent finishes the guided setup wizard (add first child,
+  /// allowance, interest rate, push notifications). Null = wizard still pending.
+  onboardingCompletedAt DateTime?
+
   users    User[]
   settings Settings?
 }

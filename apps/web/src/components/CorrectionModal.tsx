@@ -3,8 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { TransactionSummary } from '@banque-familiale/shared';
 import { Modal } from './Modal.js';
-import { useCorrectTransaction, useCurrency } from '../hooks/useTransactionActions.js';
-import { formatMoney } from '../utils/currency.js';
+import { useCorrectTransaction } from '../hooks/useTransactionActions.js';
+import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { TRANSACTION_TYPE_LABELS } from '../utils/transactionLabels.js';
 
 const formSchema = z.object({
@@ -20,7 +20,6 @@ export function CorrectionModal({
   onClose: () => void;
 }) {
   const correction = useCorrectTransaction();
-  const currency = useCurrency();
   const { register, handleSubmit } = useForm<FormValues>({ resolver: zodResolver(formSchema) });
 
   function onSubmit(values: FormValues) {
@@ -35,7 +34,7 @@ export function CorrectionModal({
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {transaction.childFirstName} · {TRANSACTION_TYPE_LABELS[transaction.type]} ·{' '}
-          {formatMoney(transaction.amountCents, currency)}
+          {formatMoney(transaction.amountCents, STORAGE_CURRENCY)}
         </p>
         <p className="text-sm text-slate-500 dark:text-slate-500">
           Une nouvelle opération inverse sera créée — l'historique original reste visible.

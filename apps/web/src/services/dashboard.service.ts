@@ -3,10 +3,14 @@ import type {
   ParentDashboardOverview,
   TransactionSummary,
 } from '@banque-familiale/shared';
-import { apiGet } from './api.js';
+import { apiGet, apiPost } from './api.js';
 
 export function fetchParentOverview(): Promise<ParentDashboardOverview> {
   return apiGet<ParentDashboardOverview>('/dashboard/overview');
+}
+
+export function completeOnboarding(): Promise<void> {
+  return apiPost<void>('/dashboard/complete-onboarding');
 }
 
 export function fetchRecentTransactions(limit = 15): Promise<TransactionSummary[]> {

@@ -10,6 +10,8 @@ export interface ParentDashboardOverview {
   totalBalanceCents: number;
   children: ChildBalanceSummary[];
   pendingRequestsCount: number;
+  /// False only for the very first parent, until they finish the guided setup wizard.
+  onboardingCompleted: boolean;
 }
 
 export interface Sibling {

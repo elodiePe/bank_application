@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { RootLayout } from './layouts/RootLayout.js';
 import { DashboardRouter } from './pages/DashboardRouter.js';
+import { OnboardingWizard } from './pages/OnboardingWizard.js';
 import { TimelinePage } from './pages/TimelinePage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
 import { StockPortfolioPage } from './pages/StockPortfolioPage.js';
@@ -32,6 +33,14 @@ export function App() {
             <RequireFamilyOwner>
               <LoginPage />
             </RequireFamilyOwner>
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            <RequireAuth>
+              <OnboardingWizard />
+            </RequireAuth>
           }
         />
         <Route

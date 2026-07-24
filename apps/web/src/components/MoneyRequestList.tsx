@@ -1,9 +1,8 @@
 import { motion } from 'framer-motion';
 import type { MoneyRequestSummary } from '@banque-familiale/shared';
-import { formatMoney } from '../utils/currency.js';
+import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { MONEY_REQUEST_STATUS_LABELS, MONEY_REQUEST_TYPE_LABELS } from '../utils/moneyRequestLabels.js';
 import { useApproveMoneyRequest, useCancelMoneyRequest, useRejectMoneyRequest } from '../hooks/useMoneyRequests.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -20,7 +19,6 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
   const approve = useApproveMoneyRequest();
   const reject = useRejectMoneyRequest();
   const cancel = useCancelMoneyRequest();
-  const currency = useCurrency();
 
   if (requests.length === 0) {
     return (
@@ -54,7 +52,7 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
                 {r.targetFirstName ? ` → ${r.targetFirstName}` : ''} · {MONEY_REQUEST_TYPE_LABELS[r.type]}
               </p>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {formatMoney(r.amountCents, currency)}
+                {formatMoney(r.amountCents, STORAGE_CURRENCY)}
                 {r.comment ? ` · ${r.comment}` : ''} · {formatDate(r.createdAt)} ·{' '}
                 {MONEY_REQUEST_STATUS_LABELS[r.status]}
                 {r.respondedByFirstName ? ` (${r.respondedByFirstName})` : ''}

@@ -2,7 +2,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from './Modal.js';
-import { useCurrency, useDeposit, useWithdrawal } from '../hooks/useTransactionActions.js';
+import { useDeposit, useWithdrawal } from '../hooks/useTransactionActions.js';
+import { STORAGE_CURRENCY } from '../utils/currency.js';
 import { ApiError } from '../services/api.js';
 
 const formSchema = z.object({
@@ -26,7 +27,6 @@ interface MoneyActionModalProps {
 export function MoneyActionModal({ mode, accountId, childFirstName, onClose }: MoneyActionModalProps) {
   const deposit = useDeposit();
   const withdrawal = useWithdrawal();
-  const currency = useCurrency();
   const mutation = mode === 'DEPOSIT' ? deposit : withdrawal;
 
   const {
@@ -48,7 +48,7 @@ export function MoneyActionModal({ mode, accountId, childFirstName, onClose }: M
     <Modal open onClose={onClose} title={title}>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="text-sm font-medium" htmlFor="amountChf">
-          Montant ({currency})
+          Montant ({STORAGE_CURRENCY})
         </label>
         <input
           id="amountChf"

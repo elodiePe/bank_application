@@ -1,7 +1,8 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Navigate, Outlet } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme.js';
 import { useCurrentUser } from '../hooks/useAuth.js';
 import { useLogout } from '../hooks/useLogout.js';
+import { useParentOverview } from '../hooks/useDashboard.js';
 import { NotificationBell } from '../components/NotificationBell.js';
 import { HeaderOverflowMenu } from '../components/HeaderOverflowMenu.js';
 
@@ -9,6 +10,13 @@ export function RootLayout() {
   const { theme, toggleTheme } = useTheme();
   const { data: user } = useCurrentUser();
   const logout = useLogout();
+  // First parent only: funnel them into the setup wizard until it's done, regardless of
+  // which URL they land on (covers a reload/close mid-wizard, not just the initial redirect).
+  const overview = useParentOverview(user?.role === 'PARENT');
+
+  if (user?.role === 'PARENT' && overview.data && !overview.data.onboardingCompleted) {
+    return <Navigate to="/onboarding" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-50">

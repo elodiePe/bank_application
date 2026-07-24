@@ -4,8 +4,8 @@ import { motion } from 'framer-motion';
 import { useCurrentUser } from '../hooks/useAuth.js';
 import { useChildOverview, useMyTransactions } from '../hooks/useDashboard.js';
 import { useMyRequests } from '../hooks/useMoneyRequests.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
-import { formatMoney } from '../utils/currency.js';
+import { convertCents, useFxRate } from '../hooks/useFx.js';
+import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { RecentTransactionsList } from '../components/RecentTransactionsList.js';
 import { MoneyRequestList } from '../components/MoneyRequestList.js';
 import { RequestMoneyModal } from '../components/RequestMoneyModal.js';
@@ -16,7 +16,7 @@ export function ChildDashboardPage() {
   const overview = useChildOverview();
   const transactions = useMyTransactions();
   const requests = useMyRequests();
-  const currency = useCurrency();
+  const { currency, rate } = useFxRate();
   const [requestOpen, setRequestOpen] = useState(false);
 
   const receivedPending = (requests.data ?? []).filter(
@@ -33,11 +33,13 @@ export function ChildDashboardPage() {
       >
         <p className="text-sm text-brand-100">Bonjour {user?.firstName} 👋</p>
         <p className="mt-1 text-3xl font-bold">
-          {overview.isLoading ? '…' : formatMoney(overview.data?.balanceCents ?? 0, currency)}
+          {overview.isLoading
+            ? '…'
+            : formatMoney(convertCents(overview.data?.balanceCents ?? 0, rate), currency)}
         </p>
         {overview.data && overview.data.weeklyAllowanceCents > 0 && (
           <p className="mt-3 text-sm text-brand-100">
-            Argent de poche : {formatMoney(overview.data.weeklyAllowanceCents, currency)} / semaine
+            Argent de poche : {formatMoney(overview.data.weeklyAllowanceCents, STORAGE_CURRENCY)} / semaine
           </p>
         )}
       </motion.div>

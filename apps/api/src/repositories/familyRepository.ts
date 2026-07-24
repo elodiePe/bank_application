@@ -58,6 +58,10 @@ export function createFamilyRepository(prisma: PrismaClient) {
       return prisma.family.update({ where: { id }, data: { ownerEmailVerifiedAt: new Date() } });
     },
 
+    markOnboardingComplete(id: string) {
+      return prisma.family.update({ where: { id }, data: { onboardingCompletedAt: new Date() } });
+    },
+
     /// Also clears any lockout — a successful reset proves the new owner of the inbox,
     /// so there is no reason to keep them locked out on the old failed attempts.
     setOwnerPasswordHash(id: string, ownerPasswordHash: string) {

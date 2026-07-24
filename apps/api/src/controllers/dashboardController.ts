@@ -30,6 +30,11 @@ export function createDashboardController(dashboardService: DashboardService) {
       res.json(overview);
     },
 
+    async completeOnboarding(req: Request, res: Response) {
+      await dashboardService.completeOnboarding(req.auth!.familyId);
+      res.status(204).end();
+    },
+
     async getRecentTransactions(req: Request, res: Response) {
       const transactions = await dashboardService.getRecentFamilyTransactions(
         req.auth!.familyId,

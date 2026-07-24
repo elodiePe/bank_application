@@ -7,6 +7,7 @@ import { CurrencySettings } from '../components/CurrencySettings.js';
 import { WeeklyAllowanceSettings } from '../components/WeeklyAllowanceSettings.js';
 import { FamilyManagementPanel } from '../components/FamilyManagementPanel.js';
 import { MyAccountSettings } from '../components/MyAccountSettings.js';
+import { PushNotificationSettings } from '../components/PushNotificationSettings.js';
 import { DeleteFamilyPanel } from '../components/DeleteFamilyPanel.js';
 
 export function SettingsPage() {
@@ -26,6 +27,7 @@ export function SettingsPage() {
         {isParent && overview.data && <WeeklyAllowanceSettings children={overview.data.children} />}
         {isParent && <FamilyManagementPanel />}
         <MyAccountSettings />
+        <PushNotificationSettings />
 
         {isParent && (
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">

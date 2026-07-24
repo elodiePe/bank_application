@@ -37,14 +37,43 @@ describe('memberService (seeded demo family)', () => {
     });
   });
 
-  it('lets a parent set their own email, rejecting one already used by someone else', async () => {
-    await service.setOwnEmail('demo-papa', 'papa@example.com');
-    const members = await service.listMembers('demo-family');
-    expect(members.find((m) => m.id === 'demo-papa')?.email).toBe('papa@example.com');
+  it('lets a parent set their own email once, but never change an existing one', async () => {
+    // Papa already has an email from seed data — changing it must be blocked.
+    await expect(service.setOwnEmail('demo-papa', 'new-papa@example.com')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
 
-    await expect(service.setOwnEmail('demo-maman', 'papa@example.com')).rejects.toMatchObject({
+    // A freshly added parent has no email yet, so they can set one for the first time.
+    const newParent = await service.addFamilyMember({
+      familyId: 'demo-family',
+      actorId: 'demo-papa',
+      firstName: 'Nouveau',
+      role: 'PARENT',
+      password: 'newpass123',
+    });
+    await service.setOwnEmail(newParent.id, 'nouveau@example.com');
+    const members = await service.listMembers('demo-family');
+    expect(members.find((m) => m.id === newParent.id)?.email).toBe('nouveau@example.com');
+
+    // But once set, it's a one-time thing for them too.
+    await expect(service.setOwnEmail(newParent.id, 'other@example.com')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+
+    // Still rejects an email already used by someone else.
+    const anotherParent = await service.addFamilyMember({
+      familyId: 'demo-family',
+      actorId: 'demo-papa',
+      firstName: 'Encore',
+      role: 'PARENT',
+      password: 'newpass123',
+    });
+    await expect(service.setOwnEmail(anotherParent.id, 'nouveau@example.com')).rejects.toMatchObject({
       code: 'CONFLICT',
     });
+
+    // Clean up: later tests assume the seeded family's original parent count/composition.
+    await db.prisma.user.deleteMany({ where: { id: { in: [newParent.id, anotherParent.id] } } });
   });
 
   it('lets a user change their own password/PIN only with the correct current one', async () => {
@@ -158,7 +187,7 @@ describe('memberService (seeded demo family)', () => {
       familyId: 'demo-family',
       actorId: 'demo-papa',
       targetUserId: 'demo-damien',
-      confirmEmail: 'papa@example.com',
+      confirmEmail: 'papa@banque-familiale.local',
     });
 
     const members = await service.listMembers('demo-family');
@@ -175,7 +204,7 @@ describe('memberService (seeded demo family)', () => {
         familyId: 'demo-family',
         actorId: 'demo-papa',
         targetUserId: 'demo-papa',
-        confirmEmail: 'papa@example.com',
+        confirmEmail: 'papa@banque-familiale.local',
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
@@ -184,14 +213,14 @@ describe('memberService (seeded demo family)', () => {
       familyId: 'demo-family',
       actorId: 'demo-papa',
       targetUserId: 'demo-maman',
-      confirmEmail: 'papa@example.com',
+      confirmEmail: 'papa@banque-familiale.local',
     });
     const tonton = (await service.listMembers('demo-family')).find((m) => m.firstName === 'Tonton')!;
     await service.deactivateMember({
       familyId: 'demo-family',
       actorId: 'demo-papa',
       targetUserId: tonton.id,
-      confirmEmail: 'papa@example.com',
+      confirmEmail: 'papa@banque-familiale.local',
     });
 
     // Self-deactivation stays blocked.
@@ -200,7 +229,7 @@ describe('memberService (seeded demo family)', () => {
         familyId: 'demo-family',
         actorId: 'demo-papa',
         targetUserId: 'demo-papa',
-        confirmEmail: 'papa@example.com',
+        confirmEmail: 'papa@banque-familiale.local',
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
 

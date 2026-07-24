@@ -8,3 +8,4 @@ export * from './moneyRequest.js';
 export * from './notification.js';
 export * from './member.js';
 export * from './stock.js';
+export * from './fx.js';

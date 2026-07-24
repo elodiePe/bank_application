@@ -6,7 +6,6 @@ import {
   useMyNotifications,
   useUnreadNotificationCount,
 } from '../hooks/useNotifications.js';
-import { usePushSubscription } from '../pwa/usePushSubscription.js';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('fr-CH', {
@@ -23,7 +22,6 @@ export function NotificationBell() {
   const notifications = useMyNotifications();
   const markAsRead = useMarkNotificationAsRead();
   const markAllAsRead = useMarkAllNotificationsAsRead();
-  const push = usePushSubscription();
 
   const unreadCount = unread.data?.count ?? 0;
 
@@ -68,23 +66,6 @@ export function NotificationBell() {
                   </button>
                 )}
               </div>
-
-              {(push.state === 'unsubscribed' || push.state === 'subscribed') && (
-                <button
-                  type="button"
-                  onClick={() => (push.state === 'subscribed' ? push.unsubscribe() : push.subscribe())}
-                  className="mb-1 w-full rounded-lg px-2 py-1.5 text-left text-xs text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                >
-                  {push.state === 'subscribed'
-                    ? '🔕 Désactiver les notifications push'
-                    : '🔔 Activer les notifications push sur cet appareil'}
-                </button>
-              )}
-              {push.state === 'denied' && (
-                <p className="mb-1 px-2 py-1.5 text-xs text-slate-400 dark:text-slate-500">
-                  Notifications bloquées — autorise-les dans les réglages du navigateur.
-                </p>
-              )}
 
               {notifications.data?.length === 0 && (
                 <p className="p-4 text-center text-sm text-slate-500 dark:text-slate-400">

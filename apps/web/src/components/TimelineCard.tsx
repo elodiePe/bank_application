@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import type { TransactionSummary } from '@banque-familiale/shared';
-import { formatMoney } from '../utils/currency.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
+import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import {
   TRANSACTION_STATUS_LABELS,
   TRANSACTION_TYPE_ICONS,
@@ -33,7 +32,6 @@ interface TimelineCardProps {
 
 export function TimelineCard({ transaction: t, index, showChildName, onCorrect }: TimelineCardProps) {
   const sign = transactionSign(t);
-  const currency = useCurrency();
 
   return (
     <motion.div
@@ -73,10 +71,10 @@ export function TimelineCard({ transaction: t, index, showChildName, onCorrect }
           }
         >
           {sign > 0 ? '+' : sign < 0 ? '−' : ''}
-          {formatMoney(t.amountCents, currency)}
+          {formatMoney(t.amountCents, STORAGE_CURRENCY)}
         </span>
         <span className="text-xs text-slate-400 dark:text-slate-500">
-          Solde : {formatMoney(t.balanceAfterCents, currency)}
+          Solde : {formatMoney(t.balanceAfterCents, STORAGE_CURRENCY)}
         </span>
         <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE_CLASSES[t.status]}`}>
           {TRANSACTION_STATUS_LABELS[t.status]}

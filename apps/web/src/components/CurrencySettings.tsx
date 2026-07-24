@@ -11,7 +11,8 @@ export function CurrencySettings() {
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <h3 className="font-medium">Devise</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        Change uniquement l'affichage des montants — les soldes existants ne sont pas convertis.
+        Convertit le solde total et les soldes des enfants au taux de change actuel. L'historique
+        des opérations reste toujours affiché dans sa devise d'origine ({'CHF'}).
       </p>
       <select
         value={settings.data.currency}

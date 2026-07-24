@@ -5,7 +5,7 @@ import type { ChildBalanceSummary, TransactionSummary } from '@banque-familiale/
 import { useCurrentUser } from '../hooks/useAuth.js';
 import { useParentOverview, useRecentTransactions } from '../hooks/useDashboard.js';
 import { usePendingRequests } from '../hooks/useMoneyRequests.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
+import { convertCents, useFxRate } from '../hooks/useFx.js';
 import { formatMoney } from '../utils/currency.js';
 import { ChildBalanceCard } from '../components/ChildBalanceCard.js';
 import { RecentTransactionsList } from '../components/RecentTransactionsList.js';
@@ -23,7 +23,7 @@ export function ParentDashboardPage() {
   const overview = useParentOverview();
   const recentTransactions = useRecentTransactions();
   const pendingRequests = usePendingRequests();
-  const currency = useCurrency();
+  const { currency, rate } = useFxRate();
 
   const [moneyAction, setMoneyAction] = useState<MoneyAction | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -39,7 +39,9 @@ export function ParentDashboardPage() {
       >
         <p className="text-sm text-brand-100">Solde total de la famille</p>
         <p className="mt-1 text-3xl font-bold">
-          {overview.isLoading ? '…' : formatMoney(overview.data?.totalBalanceCents ?? 0, currency)}
+          {overview.isLoading
+            ? '…'
+            : formatMoney(convertCents(overview.data?.totalBalanceCents ?? 0, rate), currency)}
         </p>
         {overview.data && overview.data.pendingRequestsCount > 0 && (
           <p className="mt-3 text-sm text-brand-100">

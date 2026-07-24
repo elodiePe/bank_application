@@ -76,7 +76,10 @@ export function LoginPage() {
       const created = await bootstrapParent(values);
       await loginWithPassword({ userId: created.id, password: values.password });
     },
-    onSuccess: onLoginSuccess,
+    onSuccess: async () => {
+      await invalidateCurrentUser();
+      navigate('/onboarding', { replace: true });
+    },
   });
 
   const {

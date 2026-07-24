@@ -1,8 +1,7 @@
 import { motion } from 'framer-motion';
 import type { TransactionSummary } from '@banque-familiale/shared';
-import { formatMoney } from '../utils/currency.js';
+import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { TRANSACTION_TYPE_LABELS, transactionSign } from '../utils/transactionLabels.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -14,7 +13,6 @@ interface RecentTransactionsListProps {
 }
 
 export function RecentTransactionsList({ transactions, onCorrect }: RecentTransactionsListProps) {
-  const currency = useCurrency();
   if (transactions.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
@@ -54,7 +52,7 @@ export function RecentTransactionsList({ transactions, onCorrect }: RecentTransa
                 }
               >
                 {sign > 0 ? '+' : sign < 0 ? '−' : ''}
-                {formatMoney(t.amountCents, currency)}
+                {formatMoney(t.amountCents, STORAGE_CURRENCY)}
               </span>
               {onCorrect && t.isReversible && (
                 <button

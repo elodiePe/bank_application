@@ -66,7 +66,16 @@ export function createDashboardService(deps: {
       const totalBalanceCents = children.reduce((sum, c) => sum + c.balanceCents, 0);
       const pendingRequestsCount = await deps.moneyRequestRepository.countPendingForFamily(familyId);
 
-      return { totalBalanceCents, children, pendingRequestsCount };
+      return {
+        totalBalanceCents,
+        children,
+        pendingRequestsCount,
+        onboardingCompleted: family.onboardingCompletedAt !== null,
+      };
+    },
+
+    async completeOnboarding(familyId: string): Promise<void> {
+      await deps.familyRepository.markOnboardingComplete(familyId);
     },
 
     async getRecentFamilyTransactions(familyId: string, limit = 15): Promise<TransactionSummary[]> {

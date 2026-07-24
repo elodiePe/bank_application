@@ -15,6 +15,7 @@ import { createNotificationRouter } from './routes/notification.routes.js';
 import { createMemberRouter } from './routes/member.routes.js';
 import { createFamilyAuthRouter } from './routes/familyAuth.routes.js';
 import { createStockRouter } from './routes/stock.routes.js';
+import { createFxRouter } from './routes/fx.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -43,6 +44,7 @@ export function createApp() {
   app.use('/notifications', createNotificationRouter(prisma));
   app.use('/members', createMemberRouter(prisma));
   app.use('/stocks', createStockRouter(prisma));
+  app.use('/fx', createFxRouter());
 
   app.use(errorHandler);
 

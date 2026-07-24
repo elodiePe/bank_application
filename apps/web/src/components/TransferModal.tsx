@@ -3,7 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { ChildBalanceSummary } from '@banque-familiale/shared';
 import { Modal } from './Modal.js';
-import { useCurrency, useTransfer } from '../hooks/useTransactionActions.js';
+import { useTransfer } from '../hooks/useTransactionActions.js';
+import { STORAGE_CURRENCY } from '../utils/currency.js';
 import { ApiError } from '../services/api.js';
 
 const formSchema = z
@@ -31,7 +32,6 @@ interface TransferModalProps {
 
 export function TransferModal({ children, onClose }: TransferModalProps) {
   const transfer = useTransfer();
-  const currency = useCurrency();
 
   const {
     register,
@@ -91,7 +91,7 @@ export function TransferModal({ children, onClose }: TransferModalProps) {
         )}
 
         <label className="text-sm font-medium" htmlFor="amountChf">
-          Montant ({currency})
+          Montant ({STORAGE_CURRENCY})
         </label>
         <input
           id="amountChf"

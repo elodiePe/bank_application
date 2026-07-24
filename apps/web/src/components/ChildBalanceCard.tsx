@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import type { ChildBalanceSummary } from '@banque-familiale/shared';
 import { formatMoney } from '../utils/currency.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
+import { convertCents, useFxRate } from '../hooks/useFx.js';
 
 interface ChildBalanceCardProps {
   child: ChildBalanceSummary;
@@ -12,7 +12,7 @@ interface ChildBalanceCardProps {
 }
 
 export function ChildBalanceCard({ child, index, onDeposit, onWithdraw, onGiftStock }: ChildBalanceCardProps) {
-  const currency = useCurrency();
+  const { currency, rate } = useFxRate();
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -27,7 +27,7 @@ export function ChildBalanceCard({ child, index, onDeposit, onWithdraw, onGiftSt
         <div>
           <span className="block font-medium">{child.firstName}</span>
           <span className="block text-sm text-slate-500 dark:text-slate-400">
-            {formatMoney(child.balanceCents, currency)}
+            {formatMoney(convertCents(child.balanceCents, rate), currency)}
           </span>
         </div>
       </div>

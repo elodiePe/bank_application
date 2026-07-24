@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Sibling } from '@banque-familiale/shared';
 import { Modal } from './Modal.js';
 import { useCreateMoneyRequest } from '../hooks/useMoneyRequests.js';
-import { useCurrency } from '../hooks/useTransactionActions.js';
+import { STORAGE_CURRENCY } from '../utils/currency.js';
 
 const formSchema = z
   .object({
@@ -21,7 +21,6 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function RequestMoneyModal({ siblings, onClose }: { siblings: Sibling[]; onClose: () => void }) {
   const createRequest = useCreateMoneyRequest();
-  const currency = useCurrency();
   const {
     register,
     handleSubmit,
@@ -85,7 +84,7 @@ export function RequestMoneyModal({ siblings, onClose }: { siblings: Sibling[]; 
         )}
 
         <label className="text-sm font-medium" htmlFor="amountChf">
-          Montant ({currency})
+          Montant ({STORAGE_CURRENCY})
         </label>
         <input
           id="amountChf"

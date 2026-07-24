@@ -3,8 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { ChildBalanceSummary } from '@banque-familiale/shared';
-import { useCurrency, useSetWeeklyAllowance } from '../hooks/useTransactionActions.js';
-import { formatMoney } from '../utils/currency.js';
+import { useSetWeeklyAllowance } from '../hooks/useTransactionActions.js';
+import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 
 const formSchema = z.object({
   amountChf: z.coerce.number().min(0, 'Ne peut pas être négatif'),
@@ -14,7 +14,6 @@ type FormValues = z.infer<typeof formSchema>;
 function AllowanceRow({ child }: { child: ChildBalanceSummary }) {
   const [editing, setEditing] = useState(false);
   const setAllowance = useSetWeeklyAllowance();
-  const currency = useCurrency();
   const { register, handleSubmit } = useForm<FormValues>({ resolver: zodResolver(formSchema) });
 
   function onSubmit(values: FormValues) {
@@ -31,7 +30,7 @@ function AllowanceRow({ child }: { child: ChildBalanceSummary }) {
         <div className="flex items-center gap-3">
           <span className="text-sm text-slate-600 dark:text-slate-400">
             {child.weeklyAllowanceCents > 0
-              ? `${formatMoney(child.weeklyAllowanceCents, currency)} / semaine`
+              ? `${formatMoney(child.weeklyAllowanceCents, STORAGE_CURRENCY)} / semaine`
               : 'Désactivé'}
           </span>
           <button
@@ -52,7 +51,7 @@ function AllowanceRow({ child }: { child: ChildBalanceSummary }) {
             {...register('amountChf')}
             className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-950"
           />
-          <span className="text-sm">{currency}</span>
+          <span className="text-sm">{STORAGE_CURRENCY}</span>
           <button
             type="submit"
             disabled={setAllowance.isPending}

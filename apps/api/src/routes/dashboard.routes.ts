@@ -29,6 +29,11 @@ export function createDashboardRouter(prisma: PrismaClient) {
     requireRole('PARENT'),
     asyncHandler((req, res) => controller.getOverview(req, res)),
   );
+  router.post(
+    '/complete-onboarding',
+    requireRole('PARENT'),
+    asyncHandler((req, res) => controller.completeOnboarding(req, res)),
+  );
   router.get(
     '/recent-transactions',
     requireRole('PARENT'),

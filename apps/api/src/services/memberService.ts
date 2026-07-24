@@ -80,7 +80,14 @@ export function createMemberService(prisma: PrismaClient) {
       return members.map(toDetail);
     },
 
+    /// One-time only: once a parent has an email on file, it can't be changed — it's the
+    /// address used to confirm account deletion and other sensitive actions, so letting it
+    /// be swapped out would undermine that.
     async setOwnEmail(userId: string, email: string) {
+      const current = await userRepo.findById(userId);
+      if (current?.email) {
+        throw new ForbiddenError('Ton adresse e-mail est déjà définie et ne peut plus être modifiée.');
+      }
       const existing = await userRepo.findByEmail(email);
       if (existing && existing.id !== userId) {
         throw new ConflictError('Cette adresse e-mail est déjà utilisée par un autre compte.');
