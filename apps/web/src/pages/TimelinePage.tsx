@@ -7,6 +7,7 @@ import { TimelineCard } from '../components/TimelineCard.js';
 import { TimelineFilters } from '../components/TimelineFilters.js';
 import { Pagination } from '../components/Pagination.js';
 import { CorrectionModal } from '../components/CorrectionModal.js';
+import { DisputeModal } from '../components/DisputeModal.js';
 
 const DEFAULT_QUERY: TransactionListQuery = { page: 1, pageSize: 20, sortBy: 'occurredAt', sortDir: 'desc' };
 
@@ -16,6 +17,7 @@ export function TimelinePage() {
 
   const [query, setQuery] = useState<TransactionListQuery>(DEFAULT_QUERY);
   const [correctionTarget, setCorrectionTarget] = useState<TransactionSummary | null>(null);
+  const [disputeTarget, setDisputeTarget] = useState<TransactionSummary | null>(null);
 
   const overview = useParentOverview();
   const familyResult = useFamilyTimeline(query, isParent);
@@ -25,7 +27,7 @@ export function TimelinePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Historique complet</h1>
+      <h1 className="text-2xl font-bold">Historique des transactions</h1>
 
       <TimelineFilters
         query={query}
@@ -41,7 +43,7 @@ export function TimelinePage() {
       {result.data && (
         <>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            {result.data.total} opération{result.data.total > 1 ? 's' : ''}
+            {result.data.total} transaction{result.data.total > 1 ? 's' : ''}
           </p>
 
           {result.data.items.length === 0 ? (
@@ -57,6 +59,7 @@ export function TimelinePage() {
                   index={index}
                   showChildName={isParent}
                   onCorrect={isParent ? setCorrectionTarget : undefined}
+                  onDispute={!isParent ? setDisputeTarget : undefined}
                 />
               ))}
             </div>
@@ -73,6 +76,9 @@ export function TimelinePage() {
 
       {correctionTarget && (
         <CorrectionModal transaction={correctionTarget} onClose={() => setCorrectionTarget(null)} />
+      )}
+      {disputeTarget && (
+        <DisputeModal transaction={disputeTarget} onClose={() => setDisputeTarget(null)} />
       )}
     </div>
   );

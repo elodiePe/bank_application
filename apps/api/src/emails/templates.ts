@@ -72,18 +72,34 @@ export function resetPasswordRequestTemplate(params: { familyName: string; reset
   };
 }
 
-export function resetMemberPasswordRequestTemplate(params: { firstName: string; resetUrl: string }): EmailContent {
+export function resetMemberPinRequestTemplate(params: { firstName: string; resetUrl: string }): EmailContent {
   const firstName = escapeHtml(params.firstName);
   return {
-    subject: 'Réinitialisez votre mot de passe — Banque Familiale',
+    subject: 'Réinitialisez votre code PIN — Banque Familiale',
     html: emailLayout({
-      previewText: 'Réinitialisez votre mot de passe',
+      previewText: 'Réinitialisez votre code PIN',
       bodyHtml: `
-        <h1 style="margin:0 0 12px;font-size:18px;">Mot de passe oublié ?</h1>
-        <p style="margin:0 0 8px;">Bonjour ${firstName}, une demande de réinitialisation de ton mot de passe a été effectuée.</p>
-        <p style="margin:0 0 8px;">Si tu es à l'origine de cette demande, choisis un nouveau mot de passe ci-dessous :</p>
-        ${emailButton({ href: params.resetUrl, label: 'Choisir un nouveau mot de passe' })}
-        <p style="margin:20px 0 0;font-size:12px;color:#64748b;">Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette demande, ignore cet e-mail — ton mot de passe restera inchangé.</p>
+        <h1 style="margin:0 0 12px;font-size:18px;">Code PIN oublié ?</h1>
+        <p style="margin:0 0 8px;">Bonjour ${firstName}, une demande de réinitialisation de ton code PIN a été effectuée.</p>
+        <p style="margin:0 0 8px;">Si tu es à l'origine de cette demande, choisis un nouveau code PIN ci-dessous :</p>
+        ${emailButton({ href: params.resetUrl, label: 'Choisir un nouveau code PIN' })}
+        <p style="margin:20px 0 0;font-size:12px;color:#64748b;">Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette demande, ignore cet e-mail — ton code PIN restera inchangé.</p>
+      `,
+    }),
+  };
+}
+
+export function pinChangedTemplate(params: { firstName: string }): EmailContent {
+  const firstName = escapeHtml(params.firstName);
+  const when = new Date().toLocaleString('fr-CH', { dateStyle: 'long', timeStyle: 'short' });
+  return {
+    subject: 'Votre code PIN a été modifié — Banque Familiale',
+    html: emailLayout({
+      previewText: 'Le code PIN de votre compte vient d\'être modifié',
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:18px;">Bonjour ${firstName},</h1>
+        <p style="margin:0 0 8px;">Le code PIN de votre compte vient d'être modifié, le ${escapeHtml(when)}.</p>
+        <p style="margin:16px 0 0;">Si c'est bien vous, aucune action n'est requise. Si vous n'êtes pas à l'origine de ce changement, contactez immédiatement un autre parent de la famille pour sécuriser le compte.</p>
       `,
     }),
   };

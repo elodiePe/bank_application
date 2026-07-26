@@ -1,5 +1,6 @@
 import type { TransactionListQuery, TransactionStatus, TransactionType } from '@banque-familiale/shared';
 import { TRANSACTION_STATUS_LABELS, TRANSACTION_TYPE_LABELS } from '../utils/transactionLabels.js';
+import { Select } from './Select.js';
 
 interface Child {
   userId: string;
@@ -13,7 +14,7 @@ interface TimelineFiltersProps {
 }
 
 const inputClass =
-  'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950';
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-950';
 
 export function TimelineFilters({ query, onChange, children }: TimelineFiltersProps) {
   function update(patch: Partial<TransactionListQuery>) {
@@ -31,45 +32,33 @@ export function TimelineFilters({ query, onChange, children }: TimelineFiltersPr
       />
 
       {children && children.length > 0 && (
-        <select
+        <Select
           value={query.childUserId ?? ''}
-          onChange={(e) => update({ childUserId: e.target.value || undefined })}
-          className={inputClass}
-        >
-          <option value="">Tous les enfants</option>
-          {children.map((c) => (
-            <option key={c.userId} value={c.userId}>
-              {c.firstName}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => update({ childUserId: v || undefined })}
+          wrapperClassName="min-w-[150px]"
+          options={[{ value: '', label: 'Tous les enfants' }, ...children.map((c) => ({ value: c.userId, label: c.firstName }))]}
+        />
       )}
 
-      <select
+      <Select
         value={query.type ?? ''}
-        onChange={(e) => update({ type: (e.target.value || undefined) as TransactionType | undefined })}
-        className={inputClass}
-      >
-        <option value="">Tous les types</option>
-        {Object.entries(TRANSACTION_TYPE_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+        onChange={(v) => update({ type: (v || undefined) as TransactionType | undefined })}
+        wrapperClassName="min-w-[150px]"
+        options={[
+          { value: '', label: 'Tous les types' },
+          ...Object.entries(TRANSACTION_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+        ]}
+      />
 
-      <select
+      <Select
         value={query.status ?? ''}
-        onChange={(e) => update({ status: (e.target.value || undefined) as TransactionStatus | undefined })}
-        className={inputClass}
-      >
-        <option value="">Tous les statuts</option>
-        {Object.entries(TRANSACTION_STATUS_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+        onChange={(v) => update({ status: (v || undefined) as TransactionStatus | undefined })}
+        wrapperClassName="min-w-[150px]"
+        options={[
+          { value: '', label: 'Tous les statuts' },
+          ...Object.entries(TRANSACTION_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+        ]}
+      />
 
       <input
         type="date"
@@ -86,22 +75,20 @@ export function TimelineFilters({ query, onChange, children }: TimelineFiltersPr
         aria-label="Date de fin"
       />
 
-      <select
+      <Select
         value={`${query.sortBy ?? 'occurredAt'}:${query.sortDir ?? 'desc'}`}
-        onChange={(e) => {
-          const [sortBy, sortDir] = e.target.value.split(':') as [
-            TransactionListQuery['sortBy'],
-            TransactionListQuery['sortDir'],
-          ];
+        onChange={(v) => {
+          const [sortBy, sortDir] = v.split(':') as [TransactionListQuery['sortBy'], TransactionListQuery['sortDir']];
           update({ sortBy, sortDir });
         }}
-        className={inputClass}
-      >
-        <option value="occurredAt:desc">Plus récent d'abord</option>
-        <option value="occurredAt:asc">Plus ancien d'abord</option>
-        <option value="amountCents:desc">Montant décroissant</option>
-        <option value="amountCents:asc">Montant croissant</option>
-      </select>
+        wrapperClassName="min-w-[170px]"
+        options={[
+          { value: 'occurredAt:desc', label: "Plus récent d'abord" },
+          { value: 'occurredAt:asc', label: "Plus ancien d'abord" },
+          { value: 'amountCents:desc', label: 'Montant décroissant' },
+          { value: 'amountCents:asc', label: 'Montant croissant' },
+        ]}
+      />
     </div>
   );
 }

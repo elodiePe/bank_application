@@ -26,14 +26,12 @@ describe('memberService (seeded demo family)', () => {
     expect(members.find((m) => m.id === 'demo-papa')).toMatchObject({
       firstName: 'Papa',
       role: 'PARENT',
-      hasPasswordLogin: true,
-      hasPinLogin: false,
+      hasPinLogin: true,
       isActive: true,
     });
     expect(members.find((m) => m.id === 'demo-elodie')).toMatchObject({
       role: 'CHILD',
       hasPinLogin: true,
-      hasPasswordLogin: false,
     });
   });
 
@@ -49,7 +47,7 @@ describe('memberService (seeded demo family)', () => {
       actorId: 'demo-papa',
       firstName: 'Nouveau',
       role: 'PARENT',
-      password: 'newpass123',
+      pin: '6789',
     });
     await service.setOwnEmail(newParent.id, 'nouveau@example.com');
     const members = await service.listMembers('demo-family');
@@ -66,7 +64,7 @@ describe('memberService (seeded demo family)', () => {
       actorId: 'demo-papa',
       firstName: 'Encore',
       role: 'PARENT',
-      password: 'newpass123',
+      pin: '6790',
     });
     await expect(service.setOwnEmail(anotherParent.id, 'nouveau@example.com')).rejects.toMatchObject({
       code: 'CONFLICT',
@@ -76,26 +74,18 @@ describe('memberService (seeded demo family)', () => {
     await db.prisma.user.deleteMany({ where: { id: { in: [newParent.id, anotherParent.id] } } });
   });
 
-  it('lets a user change their own password/PIN only with the correct current one', async () => {
+  it('lets a parent change their own PIN only with the correct current one', async () => {
     await expect(
-      service.changeOwnPassword({ userId: 'demo-papa', currentPassword: 'wrong', newPassword: 'newpass123' }),
+      service.changeOwnPin({ userId: 'demo-papa', currentPin: '0000', newPin: '9999' }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
-    await service.changeOwnPassword({
-      userId: 'demo-papa',
-      currentPassword: 'papa1234',
-      newPassword: 'newpass123',
-    });
+    await service.changeOwnPin({ userId: 'demo-papa', currentPin: '1111', newPin: '9999' });
 
-    // The old password no longer works; the new one does (verified via a second change).
+    // The old PIN no longer works; the new one does (verified via a second change).
     await expect(
-      service.changeOwnPassword({ userId: 'demo-papa', currentPassword: 'papa1234', newPassword: 'x' }),
+      service.changeOwnPin({ userId: 'demo-papa', currentPin: '1111', newPin: 'x' }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await service.changeOwnPassword({
-      userId: 'demo-papa',
-      currentPassword: 'newpass123',
-      newPassword: 'papa1234',
-    });
+    await service.changeOwnPin({ userId: 'demo-papa', currentPin: '9999', newPin: '1111' });
   });
 
   it('lets a child change their own PIN', async () => {
@@ -107,7 +97,7 @@ describe('memberService (seeded demo family)', () => {
     await service.changeOwnPin({ userId: 'demo-elodie', currentPin: '9999', newPin: '3333' }); // restore
   });
 
-  it('adds a new family member (child gets a zero-balance account, parent needs a password)', async () => {
+  it('adds a new family member (child gets a zero-balance account, parent needs a PIN too)', async () => {
     const child = await service.addFamilyMember({
       familyId: 'demo-family',
       actorId: 'demo-papa',
@@ -125,12 +115,12 @@ describe('memberService (seeded demo family)', () => {
       actorId: 'demo-papa',
       firstName: 'Tonton',
       role: 'PARENT',
-      password: 'tonton1234',
+      pin: '6543',
     });
-    expect(parent).toMatchObject({ role: 'PARENT', hasPasswordLogin: true });
+    expect(parent).toMatchObject({ role: 'PARENT', hasPinLogin: true });
   });
 
-  it('lets a parent reset another member\'s credential, invalidating their sessions', async () => {
+  it('lets a parent reset another member\'s PIN, invalidating their sessions', async () => {
     await db.prisma.refreshSession.create({
       data: {
         id: 'sess-matthieu',
@@ -149,28 +139,6 @@ describe('memberService (seeded demo family)', () => {
 
     const session = await db.prisma.refreshSession.findUniqueOrThrow({ where: { id: 'sess-matthieu' } });
     expect(session.revokedAt).not.toBeNull();
-  });
-
-  it('refuses to reset a password on a child account', async () => {
-    await expect(
-      service.resetCredential({
-        familyId: 'demo-family',
-        actorId: 'demo-papa',
-        targetUserId: 'demo-matthieu',
-        newPassword: 'shouldfail1',
-      }),
-    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
-  });
-
-  it('refuses to reset a PIN on a parent account — parents have no PIN', async () => {
-    await expect(
-      service.resetCredential({
-        familyId: 'demo-family',
-        actorId: 'demo-papa',
-        targetUserId: 'demo-maman',
-        newPin: '0000',
-      }),
-    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
   });
 
   it('deactivates a member only with the acting parent\'s own confirmed email, and keeps history', async () => {
@@ -248,15 +216,15 @@ describe('memberService (seeded demo family)', () => {
   });
 
   describe('forgot credential', () => {
-    it("emails a parent with an email on file, but refuses a child (no password to reset)", async () => {
-      await expect(service.requestPasswordReset('demo-family', 'demo-papa')).resolves.toBeUndefined();
+    it("emails a parent with an email on file, but refuses a child (no email to reset via)", async () => {
+      await expect(service.requestPinReset('demo-family', 'demo-papa')).resolves.toBeUndefined();
 
-      await expect(service.requestPasswordReset('demo-family', 'demo-elodie')).rejects.toMatchObject({
+      await expect(service.requestPinReset('demo-family', 'demo-elodie')).rejects.toMatchObject({
         code: 'INVALID_INPUT',
       });
     });
 
-    it('resets a member password with a valid token and revokes their sessions', async () => {
+    it('resets a member PIN with a valid token and revokes their sessions', async () => {
       await db.prisma.refreshSession.create({
         data: {
           id: 'sess-papa-reset',
@@ -266,24 +234,20 @@ describe('memberService (seeded demo family)', () => {
         },
       });
 
-      const token = signMemberActionToken({ userId: 'demo-papa', action: 'reset-password' });
-      await service.confirmPasswordReset({ token, newPassword: 'freshpass123' });
+      const token = signMemberActionToken({ userId: 'demo-papa', action: 'reset-pin' });
+      await service.confirmPinReset({ token, newPin: '4321' });
 
       const session = await db.prisma.refreshSession.findUniqueOrThrow({ where: { id: 'sess-papa-reset' } });
       expect(session.revokedAt).not.toBeNull();
 
-      // Restore for any later test relying on the original password.
-      await service.changeOwnPassword({
-        userId: 'demo-papa',
-        currentPassword: 'freshpass123',
-        newPassword: 'papa1234',
-      });
+      // Restore for any later test relying on the original PIN.
+      await service.changeOwnPin({ userId: 'demo-papa', currentPin: '4321', newPin: '1111' });
     });
 
     it('rejects a garbage or wrongly-scoped reset token', async () => {
-      await expect(
-        service.confirmPasswordReset({ token: 'not-a-real-token', newPassword: 'irrelevant123' }),
-      ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+      await expect(service.confirmPinReset({ token: 'not-a-real-token', newPin: '1122' })).rejects.toMatchObject({
+        code: 'INVALID_INPUT',
+      });
     });
 
     it("notifies only the family's active parents when a child forgets their PIN", async () => {

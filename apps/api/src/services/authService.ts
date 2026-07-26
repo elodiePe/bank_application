@@ -4,7 +4,7 @@ import type { AuthenticatedUser, FamilyMemberSummary } from '@banque-familiale/s
 import type { UserRepository } from '../repositories/userRepository.js';
 import type { RefreshSessionRepository } from '../repositories/refreshSessionRepository.js';
 import type { AuditLogRepository } from '../repositories/auditLogRepository.js';
-import { passwordStrategy, pinStrategy, type CredentialStrategy } from './authStrategies.js';
+import { pinStrategy, type CredentialStrategy } from './authStrategies.js';
 import {
   hashToken,
   signAccessToken,
@@ -43,6 +43,16 @@ function toAuthenticatedUser(user: User): AuthenticatedUser {
     firstName: user.firstName,
     role: user.role,
     email: user.email,
+    permissions:
+      user.role === 'PARENT'
+        ? {
+            isAdmin: user.isAdmin,
+            canManageMoney: user.canManageMoney,
+            canManageActions: user.canManageActions,
+            canManageSettings: user.canManageSettings,
+            canManageFamily: user.canManageFamily,
+          }
+        : null,
   };
 }
 
@@ -120,10 +130,6 @@ export function createAuthService(
         role: m.role,
         hasPinLogin: m.pinHash !== null,
       }));
-    },
-
-    loginWithPassword(userId: string, password: string, familyId: string) {
-      return loginWithStrategy(userId, password, passwordStrategy, familyId, 'PARENT');
     },
 
     loginWithPin(userId: string, pin: string, familyId: string) {

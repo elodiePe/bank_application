@@ -1,17 +1,8 @@
-import type {
-  AuthenticatedUser,
-  FamilyMemberSummary,
-  LoginPasswordInput,
-  LoginPinInput,
-} from '@banque-familiale/shared';
+import type { AuthenticatedUser, FamilyMemberSummary, LoginPinInput } from '@banque-familiale/shared';
 import { apiGet, apiPost } from './api.js';
 
 export function fetchFamilyMembers(): Promise<FamilyMemberSummary[]> {
   return apiGet<FamilyMemberSummary[]>('/auth/members');
-}
-
-export function loginWithPassword(input: LoginPasswordInput): Promise<AuthenticatedUser> {
-  return apiPost<AuthenticatedUser>('/auth/login-password', input);
 }
 
 export function loginWithPin(input: LoginPinInput): Promise<AuthenticatedUser> {

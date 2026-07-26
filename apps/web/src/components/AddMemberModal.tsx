@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addMemberSchema, type AddMemberInput } from '@banque-familiale/shared';
 import { Modal } from './Modal.js';
+import { Select } from './Select.js';
+import { FULL_PERMISSIONS, PermissionCheckboxes, type PermissionValues } from './PermissionCheckboxes.js';
 import { useAddMember } from '../hooks/useMembers.js';
 import { ApiError } from '../services/api.js';
 
@@ -16,16 +18,21 @@ interface AddMemberModalProps {
 
 export function AddMemberModal({ onClose }: AddMemberModalProps) {
   const [role, setRole] = useState<'PARENT' | 'CHILD'>('CHILD');
+  const [permissions, setPermissions] = useState<PermissionValues>(FULL_PERMISSIONS);
   const addMember = useAddMember();
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<AddMemberInput>({ resolver: zodResolver(addMemberSchema), defaultValues: { role: 'CHILD' } });
 
   function onSubmit(values: AddMemberInput) {
-    addMember.mutate(values, { onSuccess: onClose });
+    addMember.mutate(
+      { ...values, ...(role === 'PARENT' ? permissions : {}) },
+      { onSuccess: onClose },
+    );
   }
 
   return (
@@ -48,44 +55,42 @@ export function AddMemberModal({ onClose }: AddMemberModalProps) {
         <label className="text-sm font-medium" htmlFor="role">
           Rôle
         </label>
-        <select
-          id="role"
-          {...register('role', { onChange: (e) => setRole(e.target.value as 'PARENT' | 'CHILD') })}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-        >
-          <option value="CHILD">Enfant</option>
-          <option value="PARENT">Parent</option>
-        </select>
+        <Controller
+          name="role"
+          control={control}
+          render={({ field }) => (
+            <Select
+              id="role"
+              value={field.value}
+              onChange={(v) => {
+                field.onChange(v);
+                setRole(v as 'PARENT' | 'CHILD');
+              }}
+              options={[
+                { value: 'CHILD', label: 'Enfant' },
+                { value: 'PARENT', label: 'Parent' },
+              ]}
+            />
+          )}
+        />
 
-        {role === 'PARENT' ? (
+        <label className="text-sm font-medium" htmlFor="pin">
+          Code PIN (4 chiffres)
+        </label>
+        <input
+          id="pin"
+          type="text"
+          inputMode="numeric"
+          maxLength={4}
+          {...register('pin')}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+        />
+        {errors.pin && <p className="text-sm text-red-600 dark:text-red-400">{errors.pin.message}</p>}
+
+        {role === 'PARENT' && (
           <>
-            <label className="text-sm font-medium" htmlFor="password">
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              type="password"
-              {...register('password')}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-            />
-            {errors.password && (
-              <p className="text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>
-            )}
-          </>
-        ) : (
-          <>
-            <label className="text-sm font-medium" htmlFor="pin">
-              Code PIN (4 chiffres)
-            </label>
-            <input
-              id="pin"
-              type="text"
-              inputMode="numeric"
-              maxLength={4}
-              {...register('pin')}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-            />
-            {errors.pin && <p className="text-sm text-red-600 dark:text-red-400">{errors.pin.message}</p>}
+            <p className="text-sm font-medium">Droits de ce parent</p>
+            <PermissionCheckboxes value={permissions} onChange={setPermissions} />
           </>
         )}
 

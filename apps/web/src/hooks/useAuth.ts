@@ -18,6 +18,16 @@ export function isUnauthenticatedError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }
 
+/** For a CHILD (or while loading), every permission reads as granted — only PARENT UI
+ * gates on these, so there's nothing to hide for a child viewing their own dashboard. */
+export function usePermission(
+  permission: 'canManageMoney' | 'canManageActions' | 'canManageSettings' | 'canManageFamily',
+): boolean {
+  const { data: user } = useCurrentUser();
+  if (!user || user.role !== 'PARENT' || !user.permissions) return true;
+  return user.permissions.isAdmin || user.permissions[permission];
+}
+
 export function useInvalidateCurrentUser() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: CURRENT_USER_QUERY_KEY });

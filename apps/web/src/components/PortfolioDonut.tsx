@@ -17,7 +17,7 @@ export function PortfolioDonut({ segments, size = 168, strokeWidth = 22 }: Portf
 
   let cursor = 0;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+    <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90">
       <circle
         cx={size / 2}
         cy={size / 2}

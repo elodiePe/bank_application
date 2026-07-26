@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { loginPasswordSchema, loginPinSchema } from '@banque-familiale/shared';
+import { loginPinSchema } from '@banque-familiale/shared';
 import type { AuthService } from '../services/authService.js';
 import { setAuthCookies, clearAuthCookies, REFRESH_COOKIE_NAME } from '../utils/cookies.js';
 
@@ -16,27 +16,6 @@ export function createAuthController(authService: AuthService) {
     async listMembers(req: Request, res: Response) {
       const members = await authService.listFamilyMembers(req.familyOwner!.familyId);
       res.json(members);
-    },
-
-    async loginPassword(req: Request, res: Response) {
-      const parsed = loginPasswordSchema.safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({ error: 'INVALID_INPUT' });
-        return;
-      }
-
-      const result = await authService.loginWithPassword(
-        parsed.data.userId,
-        parsed.data.password,
-        req.familyOwner!.familyId,
-      );
-      if (!result.ok) {
-        res.status(FAILURE_STATUS[result.reason] ?? 401).json({ error: result.reason.toUpperCase() });
-        return;
-      }
-
-      setAuthCookies(res, result.tokens);
-      res.json(result.user);
     },
 
     async loginPin(req: Request, res: Response) {

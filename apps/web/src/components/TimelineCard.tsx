@@ -1,12 +1,7 @@
 import { motion } from 'framer-motion';
 import type { TransactionSummary } from '@banque-familiale/shared';
 import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
-import {
-  TRANSACTION_STATUS_LABELS,
-  TRANSACTION_TYPE_ICONS,
-  TRANSACTION_TYPE_LABELS,
-  transactionSign,
-} from '../utils/transactionLabels.js';
+import { TRANSACTION_TYPE_BG_CLASSES, TRANSACTION_TYPE_LABELS, transactionSign } from '../utils/transactionLabels.js';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -16,22 +11,36 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
 }
 
-const STATUS_BADGE_CLASSES: Record<string, string> = {
-  PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
-  COMPLETED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
-  REJECTED: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
-  REVERSED: 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-};
+function FlagIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden>
+      <path
+        d="M4 3v14M4 4h9l-2 3 2 3H4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 interface TimelineCardProps {
   transaction: TransactionSummary;
   index: number;
   showChildName?: boolean;
   onCorrect?: (transaction: TransactionSummary) => void;
+  onDispute?: (transaction: TransactionSummary) => void;
 }
 
-export function TimelineCard({ transaction: t, index, showChildName, onCorrect }: TimelineCardProps) {
+export function TimelineCard({ transaction: t, index, showChildName, onCorrect, onDispute }: TimelineCardProps) {
   const sign = transactionSign(t);
+  const meta = [
+    `${formatDate(t.occurredAt)} à ${formatTime(t.occurredAt)}`,
+    t.validatedByFirstName ? `validé par ${t.validatedByFirstName}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <motion.div
@@ -39,56 +48,64 @@ export function TimelineCard({ transaction: t, index, showChildName, onCorrect }
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index, 10) * 0.03 }}
       whileHover={{ scale: 1.01 }}
-      className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className={`rounded-2xl border border-slate-200 p-4 shadow-sm dark:border-slate-800 ${TRANSACTION_TYPE_BG_CLASSES[t.type]}`}
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl dark:bg-slate-800">
-        {TRANSACTION_TYPE_ICONS[t.type]}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 truncate font-medium">
           {showChildName ? `${t.childFirstName} · ` : ''}
           {TRANSACTION_TYPE_LABELS[t.type]}
         </p>
-        <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-          {t.comment ?? '—'}
-          {t.senderFirstName && t.receiverFirstName ? ` · ${t.senderFirstName} → ${t.receiverFirstName}` : ''}
-        </p>
-        <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-          {formatDate(t.occurredAt)} à {formatTime(t.occurredAt)}
-          {t.validatedByFirstName ? ` · validé par ${t.validatedByFirstName}` : ''}
-        </p>
-      </div>
-
-      <div className="flex shrink-0 flex-col items-end gap-1">
         <span
-          className={
+          className={`shrink-0 font-semibold ${
             sign > 0
-              ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+              ? 'text-emerald-600 dark:text-emerald-400'
               : sign < 0
-                ? 'font-semibold text-red-600 dark:text-red-400'
-                : 'font-semibold text-slate-600 dark:text-slate-400'
-          }
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-slate-600 dark:text-slate-400'
+          }`}
         >
           {sign > 0 ? '+' : sign < 0 ? '−' : ''}
           {formatMoney(t.amountCents, STORAGE_CURRENCY)}
         </span>
-        <span className="text-xs text-slate-400 dark:text-slate-500">
+      </div>
+
+      <div className="mt-0.5 flex items-start justify-between gap-3">
+        <p className="min-w-0 truncate text-sm text-slate-500 dark:text-slate-400">
+          {t.comment ?? '—'}
+          {t.senderFirstName && t.receiverFirstName ? ` · ${t.senderFirstName} → ${t.receiverFirstName}` : ''}
+        </p>
+        <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
           Solde : {formatMoney(t.balanceAfterCents, STORAGE_CURRENCY)}
         </span>
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE_CLASSES[t.status]}`}>
-          {TRANSACTION_STATUS_LABELS[t.status]}
-        </span>
-        {onCorrect && t.isReversible && (
-          <button
-            type="button"
-            onClick={() => onCorrect(t)}
-            className="text-xs text-slate-400 hover:text-brand-600 hover:underline dark:hover:text-brand-400"
-          >
-            Corriger
-          </button>
-        )}
       </div>
+
+      {(meta || onCorrect || onDispute) && (
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-black/5 pt-2 dark:border-white/5">
+          <p className="min-w-0 truncate text-xs text-slate-400 dark:text-slate-500">{meta}</p>
+          <div className="flex shrink-0 items-center gap-3">
+            {onCorrect && t.isReversible && (
+              <button
+                type="button"
+                onClick={() => onCorrect(t)}
+                className="text-xs text-slate-400 hover:text-brand-600 hover:underline dark:hover:text-brand-400"
+              >
+                Corriger
+              </button>
+            )}
+            {onDispute && t.isReversible && (
+              <button
+                type="button"
+                onClick={() => onDispute(t)}
+                aria-label="Signaler cette opération"
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-600 hover:underline dark:hover:text-red-400"
+              >
+                <FlagIcon />
+                Signaler
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

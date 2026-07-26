@@ -29,12 +29,11 @@ describe('familyRepository (seeded demo family)', () => {
     expect(children.map((c) => c.firstName).sort()).toEqual(['Damien', 'Elodie', 'Matthieu']);
 
     for (const parent of parents) {
-      expect(parent.passwordHash).toBeTruthy();
+      expect(parent.pinHash).toBeTruthy();
       expect(parent.childAccount).toBeNull();
     }
 
     for (const child of children) {
-      expect(child.passwordHash).toBeNull();
       expect(child.pinHash).toBeTruthy();
       expect(child.childAccount?.balanceCents).toBe(0);
     }

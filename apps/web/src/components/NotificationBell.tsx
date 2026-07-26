@@ -24,6 +24,7 @@ export function NotificationBell() {
   const markAllAsRead = useMarkAllNotificationsAsRead();
 
   const unreadCount = unread.data?.count ?? 0;
+  const visibleNotifications = notifications.data?.filter((n) => !n.isRead) ?? [];
 
   return (
     <div className="relative">
@@ -67,20 +68,18 @@ export function NotificationBell() {
                 )}
               </div>
 
-              {notifications.data?.length === 0 && (
+              {visibleNotifications.length === 0 && (
                 <p className="p-4 text-center text-sm text-slate-500 dark:text-slate-400">
                   Aucune notification.
                 </p>
               )}
 
               <ul className="flex flex-col gap-1">
-                {notifications.data?.map((n) => (
+                {visibleNotifications.map((n) => (
                   <li
                     key={n.id}
-                    onClick={() => !n.isRead && markAsRead.mutate(n.id)}
-                    className={`cursor-pointer rounded-lg p-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                      n.isRead ? '' : 'bg-brand-50 dark:bg-brand-900/20'
-                    }`}
+                    onClick={() => markAsRead.mutate(n.id)}
+                    className="cursor-pointer rounded-lg bg-brand-50 p-2 text-sm hover:bg-brand-100 dark:bg-brand-900/20 dark:hover:bg-brand-900/40"
                   >
                     <p className="font-medium">{n.title}</p>
                     <p className="text-slate-500 dark:text-slate-400">{n.body}</p>

@@ -14,6 +14,8 @@ export type NotificationType =
   | 'STOCK_ORDER_REJECTED'
   | 'STOCK_GIFT_RECEIVED'
   | 'CREDENTIAL_RESET_REQUESTED'
+  | 'DISPUTE_RAISED'
+  | 'DISPUTE_DISMISSED'
   | 'GENERIC';
 
 export interface NotificationSummary {
@@ -25,6 +27,7 @@ export interface NotificationSummary {
   createdAt: string;
   relatedTransactionId: string | null;
   relatedMoneyRequestId: string | null;
+  relatedDisputeId: string | null;
 }
 
 export interface PushSubscriptionKeys {

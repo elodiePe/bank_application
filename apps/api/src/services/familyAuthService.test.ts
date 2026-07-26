@@ -156,7 +156,7 @@ describe('familyAuthService', () => {
     const parent = await memberService.createFirstParent({
       familyId: reg.familyId,
       firstName: 'Parent',
-      password: 'parent-secret-1',
+      pin: '1357',
     });
     const child = await memberService.addFamilyMember({
       familyId: reg.familyId,

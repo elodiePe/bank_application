@@ -5,12 +5,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SUPPORTED_CURRENCIES, bootstrapParentSchema, type BootstrapParentInput } from '@banque-familiale/shared';
-import { useAddMember } from '../hooks/useMembers.js';
+import { useAddMember, useUpdateMemberPermissions } from '../hooks/useMembers.js';
 import { useParentOverview, useCompleteOnboarding } from '../hooks/useDashboard.js';
 import { useSetWeeklyAllowance, useSettings, useUpdateCurrency, useUpdateInterestRate } from '../hooks/useTransactionActions.js';
 import { usePushSubscription } from '../pwa/usePushSubscription.js';
 import { STORAGE_CURRENCY } from '../utils/currency.js';
 import { ApiError } from '../services/api.js';
+import { Select } from '../components/Select.js';
+import { FULL_PERMISSIONS, PermissionCheckboxes, type PermissionValues } from '../components/PermissionCheckboxes.js';
 
 type Phase = 'welcome' | 'currency' | 'child' | 'allowance' | 'moreChildren' | 'parents' | 'interest' | 'push' | 'done';
 
@@ -84,17 +86,11 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
       <p className="text-sm text-slate-600 dark:text-slate-400">
         Utilisée pour l'affichage des montants. Modifiable à tout moment depuis les Paramètres.
       </p>
-      <select
+      <Select
         value={currentValue}
-        onChange={(e) => setSelected(e.target.value)}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-      >
-        {SUPPORTED_CURRENCIES.map((c) => (
-          <option key={c.code} value={c.code}>
-            {c.label}
-          </option>
-        ))}
-      </select>
+        onChange={setSelected}
+        options={SUPPORTED_CURRENCIES.map((c) => ({ value: c.code, label: c.label }))}
+      />
       <button
         type="button"
         onClick={onSubmit}
@@ -265,8 +261,13 @@ function MoreChildrenStep({ onAddAnother, onDone }: { onAddAnother: () => void; 
 
 function AddParentsStep({ onNext }: { onNext: () => void }) {
   const addMember = useAddMember();
+  const updatePermissions = useUpdateMemberPermissions();
   const [formOpen, setFormOpen] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
+  const [pendingPermissionsFor, setPendingPermissionsFor] = useState<{ id: string; firstName: string } | null>(
+    null,
+  );
+  const [permissions, setPermissions] = useState<PermissionValues>(FULL_PERMISSIONS);
   const {
     register,
     handleSubmit,
@@ -276,14 +277,49 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
 
   function onSubmit(values: BootstrapParentInput) {
     addMember.mutate(
-      { firstName: values.firstName, role: 'PARENT', password: values.password },
+      { firstName: values.firstName, role: 'PARENT', pin: values.pin },
+      {
+        onSuccess: (created) => {
+          setFormOpen(false);
+          reset();
+          setPermissions(FULL_PERMISSIONS);
+          setPendingPermissionsFor({ id: created.id, firstName: created.firstName });
+        },
+      },
+    );
+  }
+
+  function onValidatePermissions() {
+    if (!pendingPermissionsFor) return;
+    updatePermissions.mutate(
+      { memberId: pendingPermissionsFor.id, input: permissions },
       {
         onSuccess: () => {
           setAddedCount((n) => n + 1);
-          setFormOpen(false);
-          reset();
+          setPendingPermissionsFor(null);
         },
       },
+    );
+  }
+
+  if (pendingPermissionsFor) {
+    return (
+      <StepShell>
+        <h1 className="text-xl font-bold">Droits de {pendingPermissionsFor.firstName}</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Choisis ce que {pendingPermissionsFor.firstName} peut faire dans l'application. Modifiable
+          à tout moment depuis les Paramètres.
+        </p>
+        <PermissionCheckboxes value={permissions} onChange={setPermissions} disabled={updatePermissions.isPending} />
+        <button
+          type="button"
+          onClick={onValidatePermissions}
+          disabled={updatePermissions.isPending}
+          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          {updatePermissions.isPending ? 'Enregistrement…' : 'Valider ces droits'}
+        </button>
+      </StepShell>
     );
   }
 
@@ -291,7 +327,7 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
     <StepShell>
       <h1 className="text-xl font-bold">Ajouter un autre parent ?</h1>
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Optionnel — un autre parent pourra se connecter avec son propre mot de passe. Tu pourras
+        Optionnel — un autre parent pourra se connecter avec son propre code PIN. Tu pourras
         aussi en ajouter plus tard depuis les Paramètres.
       </p>
 
@@ -334,18 +370,18 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
             <p className="text-sm text-red-600 dark:text-red-400">{errors.firstName.message}</p>
           )}
 
-          <label className="text-sm font-medium" htmlFor="parentPassword">
-            Mot de passe
+          <label className="text-sm font-medium" htmlFor="parentPin">
+            Code PIN (4 chiffres)
           </label>
           <input
-            id="parentPassword"
-            type="password"
-            {...register('password')}
+            id="parentPin"
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            {...register('pin')}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
           />
-          {errors.password && (
-            <p className="text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>
-          )}
+          {errors.pin && <p className="text-sm text-red-600 dark:text-red-400">{errors.pin.message}</p>}
 
           {addMember.isError && (
             <p className="text-sm text-red-600 dark:text-red-400">

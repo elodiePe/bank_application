@@ -62,6 +62,12 @@ enum MoneyRequestStatus {
   CANCELLED
 }
 
+enum DisputeStatus {
+  PENDING
+  DISMISSED
+  RESOLVED
+}
+
 enum NotificationType {
   MONEY_REQUEST_CREATED
   MONEY_REQUEST_APPROVED
@@ -76,6 +82,8 @@ enum NotificationType {
   STOCK_ORDER_REJECTED
   STOCK_GIFT_RECEIVED
   CREDENTIAL_RESET_REQUESTED
+  DISPUTE_RAISED
+  DISPUTE_DISMISSED
   GENERIC
 }
 
@@ -121,6 +129,15 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  /// Parents only. The single fixed admin (the first parent created for the family) can
+  /// manage the other parents' permissions below and always has full access regardless of
+  /// those booleans. Not applicable to children.
+  isAdmin           Boolean @default(false)
+  canManageMoney    Boolean @default(true)
+  canManageActions  Boolean @default(true)
+  canManageSettings Boolean @default(true)
+  canManageFamily   Boolean @default(true)
+
   /// Soft delete: a deactivated member can no longer log in and is hidden from the login
   /// picker and "add member" flows, but their transaction history is never deleted —
   /// consistent with the ledger being immutable everywhere else in this app.
@@ -135,6 +152,8 @@ model User {
   moneyRequestsMade      MoneyRequest[]     @relation("MoneyRequestRequester")
   moneyRequestsTargeted  MoneyRequest[]     @relation("MoneyRequestTarget")
   moneyRequestsResponded MoneyRequest[]     @relation("MoneyRequestResponder")
+  disputesRaised         Dispute[]          @relation("DisputeRaisedBy")
+  disputesResolved       Dispute[]          @relation("DisputeResolvedBy")
   transactionsSent       Transaction[]      @relation("TransactionSender")
   transactionsReceived   Transaction[]      @relation("TransactionReceiver")
   transactionsValidated  Transaction[]      @relation("TransactionValidator")
@@ -260,6 +279,32 @@ model MoneyRequest {
   @@index([status])
 }
 
+/// A child flagging one of their own completed transactions as erroneous. Loosely linked to
+/// the Transaction by id (same pattern as Notification's relatedTransactionId) rather than a
+/// hard relation, since a transaction can outlive/precede the dispute feature.
+model Dispute {
+  id String @id @default(cuid())
+
+  transactionId String
+
+  raisedById String
+  raisedBy   User   @relation("DisputeRaisedBy", fields: [raisedById], references: [id], onDelete: Cascade)
+
+  reason String
+  status DisputeStatus @default(PENDING)
+
+  resolvedById String?
+  resolvedBy   User?     @relation("DisputeResolvedBy", fields: [resolvedById], references: [id], onDelete: Cascade)
+  resolvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([transactionId])
+  @@index([raisedById])
+  @@index([status])
+}
+
 model Notification {
   id     String           @id @default(cuid())
   userId String
@@ -272,6 +317,7 @@ model Notification {
 
   relatedTransactionId  String?
   relatedMoneyRequestId String?
+  relatedDisputeId      String?
 
   createdAt DateTime @default(now())
 

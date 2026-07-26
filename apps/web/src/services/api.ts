@@ -19,7 +19,7 @@ async function parseErrorCode(res: Response): Promise<string> {
 }
 
 async function apiRequest<T>(
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
   path: string,
   body?: unknown,
 ): Promise<T> {
@@ -46,4 +46,8 @@ export function apiPost<T>(path: string, body?: unknown): Promise<T> {
 
 export function apiPut<T>(path: string, body?: unknown): Promise<T> {
   return apiRequest<T>('PUT', path, body);
+}
+
+export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  return apiRequest<T>('PATCH', path, body);
 }

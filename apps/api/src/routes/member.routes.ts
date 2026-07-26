@@ -5,12 +5,14 @@ import { createMemberController } from '../controllers/memberController.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireFamilyOwner } from '../middleware/requireFamilyOwner.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { createRequirePermission } from '../middleware/requirePermission.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { familyAuthRateLimiter } from '../middleware/rateLimiters.js';
 
 export function createMemberRouter(prisma: PrismaClient) {
   const memberService = createMemberService(prisma);
   const controller = createMemberController(memberService);
+  const requirePermission = createRequirePermission(prisma);
 
   const router = Router();
 
@@ -28,10 +30,10 @@ export function createMemberRouter(prisma: PrismaClient) {
   // link (own account, own inbox); a child has no email, so their parents get notified
   // and reset the PIN in person via the existing parent-authenticated /:id/reset-pin.
   router.post(
-    '/:id/request-password-reset',
+    '/:id/request-pin-reset',
     requireFamilyOwner,
     familyAuthRateLimiter,
-    asyncHandler((req, res) => controller.requestPasswordReset(req, res)),
+    asyncHandler((req, res) => controller.requestPinReset(req, res)),
   );
   router.post(
     '/:id/request-pin-reset-notification',
@@ -41,9 +43,9 @@ export function createMemberRouter(prisma: PrismaClient) {
   );
   // Public: reached from the emailed link itself, so there is no session of any kind yet.
   router.post(
-    '/reset-password/confirm',
+    '/pin-reset/confirm',
     familyAuthRateLimiter,
-    asyncHandler((req, res) => controller.confirmPasswordReset(req, res)),
+    asyncHandler((req, res) => controller.confirmPinReset(req, res)),
   );
 
   router.use(authenticate);
@@ -57,18 +59,25 @@ export function createMemberRouter(prisma: PrismaClient) {
   parentRouter.get('/', asyncHandler((req, res) => controller.listMembers(req, res)));
   parentRouter.post('/me/email', asyncHandler((req, res) => controller.setOwnEmail(req, res)));
   parentRouter.post(
-    '/me/change-password',
-    asyncHandler((req, res) => controller.changeOwnPassword(req, res)),
+    '/',
+    requirePermission('canManageFamily'),
+    asyncHandler((req, res) => controller.addMember(req, res)),
   );
-  parentRouter.post('/', asyncHandler((req, res) => controller.addMember(req, res)));
   parentRouter.post(
-    '/:id/reset-password',
-    asyncHandler((req, res) => controller.resetPassword(req, res)),
+    '/:id/reset-pin',
+    requirePermission('canManageFamily'),
+    asyncHandler((req, res) => controller.resetPin(req, res)),
   );
-  parentRouter.post('/:id/reset-pin', asyncHandler((req, res) => controller.resetPin(req, res)));
   parentRouter.post(
     '/:id/deactivate',
+    requirePermission('canManageFamily'),
     asyncHandler((req, res) => controller.deactivateMember(req, res)),
+  );
+  // Admin-only (checked in the service, since it's a meta-permission distinct from the
+  // four booleans below it governs): change what a non-admin parent is allowed to do.
+  parentRouter.patch(
+    '/:id/permissions',
+    asyncHandler((req, res) => controller.updatePermissions(req, res)),
   );
 
   router.use(parentRouter);

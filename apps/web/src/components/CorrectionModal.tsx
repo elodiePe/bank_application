@@ -15,9 +15,12 @@ type FormValues = z.infer<typeof formSchema>;
 export function CorrectionModal({
   transaction,
   onClose,
+  onCorrected,
 }: {
   transaction: TransactionSummary;
   onClose: () => void;
+  /** Called only when the correction actually succeeds (not on cancel/backdrop close). */
+  onCorrected?: () => void;
 }) {
   const correction = useCorrectTransaction();
   const { register, handleSubmit } = useForm<FormValues>({ resolver: zodResolver(formSchema) });
@@ -25,7 +28,12 @@ export function CorrectionModal({
   function onSubmit(values: FormValues) {
     correction.mutate(
       { transactionId: transaction.id, input: values },
-      { onSuccess: onClose },
+      {
+        onSuccess: () => {
+          onCorrected?.();
+          onClose();
+        },
+      },
     );
   }
 

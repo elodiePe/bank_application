@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useCurrentUser } from '../hooks/useAuth.js';
+import { useCurrentUser, usePermission } from '../hooks/useAuth.js';
 import { useParentOverview } from '../hooks/useDashboard.js';
 import { useLogoutFamily } from '../hooks/useFamilyAuth.js';
 import { InterestRateSettings } from '../components/InterestRateSettings.js';
@@ -16,16 +16,20 @@ export function SettingsPage() {
   const isParent = user?.role === 'PARENT';
   const overview = useParentOverview(isParent);
   const logoutFamily = useLogoutFamily();
+  const canManageSettings = usePermission('canManageSettings');
+  const canManageFamily = usePermission('canManageFamily');
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Paramètres</h1>
 
       <div className="space-y-3">
-        {isParent && <InterestRateSettings />}
-        {isParent && <CurrencySettings />}
-        {isParent && overview.data && <WeeklyAllowanceSettings children={overview.data.children} />}
-        {isParent && <FamilyManagementPanel />}
+        {isParent && canManageSettings && <InterestRateSettings />}
+        {isParent && canManageSettings && <CurrencySettings />}
+        {isParent && canManageSettings && overview.data && (
+          <WeeklyAllowanceSettings children={overview.data.children} />
+        )}
+        {isParent && canManageFamily && <FamilyManagementPanel />}
         <MyAccountSettings />
         <PushNotificationSettings />
 

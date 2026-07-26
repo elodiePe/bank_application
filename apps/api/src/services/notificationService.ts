@@ -14,6 +14,7 @@ function toSummary(n: {
   createdAt: Date;
   relatedTransactionId: string | null;
   relatedMoneyRequestId: string | null;
+  relatedDisputeId: string | null;
 }): NotificationSummary {
   return {
     id: n.id,
@@ -24,6 +25,7 @@ function toSummary(n: {
     createdAt: n.createdAt.toISOString(),
     relatedTransactionId: n.relatedTransactionId,
     relatedMoneyRequestId: n.relatedMoneyRequestId,
+    relatedDisputeId: n.relatedDisputeId,
   };
 }
 
@@ -263,6 +265,37 @@ export function createNotificationService(prisma: PrismaClient) {
           body: `${params.requesterFirstName} a besoin d'un nouveau code PIN. Réinitialise-le depuis « Gestion de la famille ».`,
         })),
       );
+    },
+
+    async notifyParentsOfDispute(params: {
+      familyId: string;
+      childFirstName: string;
+      amountCents: number;
+      disputeId: string;
+    }) {
+      const members = await userRepo.listFamilyMembers(params.familyId);
+      const parents = members.filter((m) => m.role === 'PARENT');
+      if (parents.length === 0) return;
+
+      await createManyAndPush(
+        parents.map((p) => ({
+          userId: p.id,
+          type: 'DISPUTE_RAISED',
+          title: `${params.childFirstName} a signalé une erreur`,
+          body: `${params.childFirstName} pense qu'une opération de ${formatChf(params.amountCents)} est incorrecte.`,
+          relatedDisputeId: params.disputeId,
+        })),
+      );
+    },
+
+    async notifyDisputeDismissed(params: { childId: string; dismissedByFirstName: string; disputeId: string }) {
+      await createAndPush({
+        userId: params.childId,
+        type: 'DISPUTE_DISMISSED',
+        title: 'Ton signalement a été examiné',
+        body: `${params.dismissedByFirstName} a vérifié ton signalement — l'opération reste inchangée.`,
+        relatedDisputeId: params.disputeId,
+      });
     },
 
     async notifyStockGiftReceived(params: {

@@ -4,23 +4,15 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import type { FamilyMemberSummary } from '@banque-familiale/shared';
-import { bootstrapParentSchema } from '@banque-familiale/shared';
-import { fetchFamilyMembers, loginWithPassword, loginWithPin } from '../services/auth.service.js';
+import { bootstrapParentSchema, type BootstrapParentInput } from '@banque-familiale/shared';
+import { fetchFamilyMembers, loginWithPin } from '../services/auth.service.js';
 import { bootstrapParent } from '../services/member.service.js';
 import { ApiError } from '../services/api.js';
 import { useInvalidateCurrentUser } from '../hooks/useAuth.js';
 import { useLogoutFamily } from '../hooks/useFamilyAuth.js';
-import { useRequestMemberPasswordReset, useRequestPinResetNotification } from '../hooks/useMembers.js';
+import { useRequestMemberPinReset, useRequestPinResetNotification } from '../hooks/useMembers.js';
 import { PinPad } from '../components/PinPad.js';
-
-const passwordFormSchema = z.object({
-  password: z.string().min(1, 'Le mot de passe est requis'),
-});
-type PasswordFormValues = z.infer<typeof passwordFormSchema>;
-
-type BootstrapFormValues = z.infer<typeof bootstrapParentSchema>;
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_CREDENTIAL: 'Identifiant incorrect.',
@@ -56,25 +48,19 @@ export function LoginPage() {
     navigate('/dashboard', { replace: true });
   }
 
-  const passwordMutation = useMutation({
-    mutationFn: (values: PasswordFormValues) =>
-      loginWithPassword({ userId: selected!.id, password: values.password }),
-    onSuccess: onLoginSuccess,
-  });
-
   const pinMutation = useMutation({
     mutationFn: (value: string) => loginWithPin({ userId: selected!.id, pin: value }),
     onSuccess: onLoginSuccess,
     onError: () => setPin(''),
   });
 
-  const requestPasswordReset = useRequestMemberPasswordReset();
+  const requestPinReset = useRequestMemberPinReset();
   const requestPinResetNotification = useRequestPinResetNotification();
 
   const bootstrapMutation = useMutation({
-    mutationFn: async (values: BootstrapFormValues) => {
+    mutationFn: async (values: BootstrapParentInput) => {
       const created = await bootstrapParent(values);
-      await loginWithPassword({ userId: created.id, password: values.password });
+      await loginWithPin({ userId: created.id, pin: values.pin });
     },
     onSuccess: async () => {
       await invalidateCurrentUser();
@@ -83,21 +69,15 @@ export function LoginPage() {
   });
 
   const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<PasswordFormValues>({ resolver: zodResolver(passwordFormSchema) });
-
-  const {
     register: registerBootstrap,
     handleSubmit: handleBootstrapSubmit,
     formState: { errors: bootstrapErrors },
-  } = useForm<BootstrapFormValues>({ resolver: zodResolver(bootstrapParentSchema) });
+  } = useForm<BootstrapParentInput>({ resolver: zodResolver(bootstrapParentSchema) });
 
   function selectMember(member: FamilyMemberSummary | null) {
     setSelected(member);
     setPin('');
-    requestPasswordReset.reset();
+    requestPinReset.reset();
     requestPinResetNotification.reset();
   }
 
@@ -166,17 +146,19 @@ export function LoginPage() {
                 {bootstrapErrors.firstName && (
                   <p className="text-sm text-red-600 dark:text-red-400">{bootstrapErrors.firstName.message}</p>
                 )}
-                <label className="text-sm font-medium" htmlFor="bootstrap-password">
-                  Mot de passe
+                <label className="text-sm font-medium" htmlFor="bootstrap-pin">
+                  Code PIN (4 chiffres)
                 </label>
                 <input
-                  id="bootstrap-password"
-                  type="password"
-                  {...registerBootstrap('password')}
+                  id="bootstrap-pin"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  {...registerBootstrap('pin')}
                   className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
                 />
-                {bootstrapErrors.password && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{bootstrapErrors.password.message}</p>
+                {bootstrapErrors.pin && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{bootstrapErrors.pin.message}</p>
                 )}
                 {bootstrapMutation.isError && (
                   <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(bootstrapMutation.error)}</p>
@@ -206,7 +188,7 @@ export function LoginPage() {
           </motion.div>
         )}
 
-        {selected && selected.role === 'CHILD' && (
+        {selected && (
           <motion.div
             key="pin"
             initial={{ opacity: 0, y: 8 }}
@@ -221,22 +203,43 @@ export function LoginPage() {
               </p>
             )}
 
-            {requestPinResetNotification.isSuccess ? (
+            {selected.role === 'CHILD' ? (
+              requestPinResetNotification.isSuccess ? (
+                <p className="text-center text-sm text-emerald-600 dark:text-emerald-400">
+                  Les parents ont été prévenus, ils peuvent réinitialiser ton code.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => requestPinResetNotification.mutate(selected.id)}
+                  disabled={requestPinResetNotification.isPending}
+                  className="text-sm text-brand-600 hover:underline disabled:opacity-60 dark:text-brand-400"
+                >
+                  {requestPinResetNotification.isPending ? 'Envoi…' : 'Code oublié ?'}
+                </button>
+              )
+            ) : requestPinReset.isSuccess ? (
               <p className="text-center text-sm text-emerald-600 dark:text-emerald-400">
-                Les parents ont été prévenus, ils peuvent réinitialiser ton code.
+                Si une adresse e-mail est enregistrée, un lien de réinitialisation vient d'être envoyé.
               </p>
             ) : (
               <button
                 type="button"
-                onClick={() => requestPinResetNotification.mutate(selected.id)}
-                disabled={requestPinResetNotification.isPending}
+                onClick={() => requestPinReset.mutate(selected.id)}
+                disabled={requestPinReset.isPending}
                 className="text-sm text-brand-600 hover:underline disabled:opacity-60 dark:text-brand-400"
               >
-                {requestPinResetNotification.isPending ? 'Envoi…' : 'Code oublié ?'}
+                {requestPinReset.isPending ? 'Envoi…' : 'Code oublié ?'}
               </button>
             )}
-            {requestPinResetNotification.isError && (
-              <p className="text-sm text-red-600 dark:text-red-400">Une erreur est survenue.</p>
+            {(selected.role === 'CHILD' ? requestPinResetNotification.isError : requestPinReset.isError) && (
+              <p className="text-sm text-red-600 dark:text-red-400">
+                {selected.role === 'PARENT' &&
+                requestPinReset.error instanceof ApiError &&
+                requestPinReset.error.code === 'INVALID_INPUT'
+                  ? "Aucune adresse e-mail n'est enregistrée pour ce compte. Demande à un autre parent de réinitialiser ton code PIN."
+                  : 'Une erreur est survenue.'}
+              </p>
             )}
 
             <button
@@ -247,73 +250,6 @@ export function LoginPage() {
               ← Changer de compte
             </button>
           </motion.div>
-        )}
-
-        {selected && selected.role === 'PARENT' && (
-          <motion.form
-            key="password"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            onSubmit={handleSubmit((values) => passwordMutation.mutate(values))}
-            className="flex w-full flex-col gap-3"
-          >
-            <label className="text-sm font-medium" htmlFor="password">
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoFocus
-              {...register('password')}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
-            />
-            {errors.password && (
-              <p className="text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>
-            )}
-            {passwordMutation.isError && (
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {errorMessage(passwordMutation.error)}
-              </p>
-            )}
-
-            {requestPasswordReset.isSuccess ? (
-              <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                Si une adresse e-mail est enregistrée, un lien de réinitialisation vient d'être envoyé.
-              </p>
-            ) : (
-              <button
-                type="button"
-                onClick={() => requestPasswordReset.mutate(selected.id)}
-                disabled={requestPasswordReset.isPending}
-                className="self-end text-sm text-brand-600 hover:underline disabled:opacity-60 dark:text-brand-400"
-              >
-                {requestPasswordReset.isPending ? 'Envoi…' : 'Mot de passe oublié ?'}
-              </button>
-            )}
-            {requestPasswordReset.isError && (
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {requestPasswordReset.error instanceof ApiError && requestPasswordReset.error.code === 'INVALID_INPUT'
-                  ? "Aucune adresse e-mail n'est enregistrée pour ce compte. Demande à un autre parent de réinitialiser ton mot de passe."
-                  : 'Une erreur est survenue.'}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={passwordMutation.isPending}
-              className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
-            >
-              {passwordMutation.isPending ? 'Connexion…' : 'Se connecter'}
-            </button>
-            <button
-              type="button"
-              onClick={() => selectMember(null)}
-              className="text-sm text-slate-500 hover:underline dark:text-slate-400"
-            >
-              ← Changer de compte
-            </button>
-          </motion.form>
         )}
       </AnimatePresence>
     </div>

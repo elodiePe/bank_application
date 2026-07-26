@@ -5,7 +5,7 @@ import { formatMoney } from '../utils/currency.js';
 // display currency, and formatMoney doesn't convert, only relabels, so this must stay fixed.
 const STOCK_CURRENCY = 'USD';
 
-export function PendingStockOrdersList() {
+export function PendingStockOrdersList({ canAct = true }: { canAct?: boolean }) {
   const pending = usePendingStockOrders();
   const approve = useApproveStockOrder();
   const reject = useRejectStockOrder();
@@ -30,24 +30,26 @@ export function PendingStockOrdersList() {
                 {o.comment ? ` · ${o.comment}` : ''}
               </p>
             </div>
-            <div className="flex shrink-0 gap-2">
-              <button
-                type="button"
-                onClick={() => approve.mutate(o.id)}
-                disabled={approve.isPending || reject.isPending}
-                className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/70"
-              >
-                Accepter
-              </button>
-              <button
-                type="button"
-                onClick={() => reject.mutate(o.id)}
-                disabled={approve.isPending || reject.isPending}
-                className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 disabled:opacity-60 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/70"
-              >
-                Refuser
-              </button>
-            </div>
+            {canAct && (
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => approve.mutate(o.id)}
+                  disabled={approve.isPending || reject.isPending}
+                  className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/70"
+                >
+                  Accepter
+                </button>
+                <button
+                  type="button"
+                  onClick={() => reject.mutate(o.id)}
+                  disabled={approve.isPending || reject.isPending}
+                  className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 disabled:opacity-60 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/70"
+                >
+                  Refuser
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>

@@ -6,6 +6,7 @@ import { createChildAccountRepository } from '../repositories/childAccountReposi
 import { createTransactionActionsController } from '../controllers/transactionActionsController.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { createRequirePermission } from '../middleware/requirePermission.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export function createTransactionActionsRouter(prisma: PrismaClient) {
@@ -16,9 +17,10 @@ export function createTransactionActionsRouter(prisma: PrismaClient) {
     notificationService,
     createChildAccountRepository(prisma),
   );
+  const requirePermission = createRequirePermission(prisma);
 
   const router = Router();
-  router.use(authenticate, requireRole('PARENT'));
+  router.use(authenticate, requireRole('PARENT'), requirePermission('canManageMoney'));
 
   router.post('/deposit', asyncHandler((req, res) => controller.deposit(req, res)));
   router.post('/withdrawal', asyncHandler((req, res) => controller.withdrawal(req, res)));

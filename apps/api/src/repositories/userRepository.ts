@@ -29,8 +29,12 @@ export function createUserRepository(prisma: PrismaClient) {
           role: true,
           email: true,
           pinHash: true,
-          passwordHash: true,
           deactivatedAt: true,
+          isAdmin: true,
+          canManageMoney: true,
+          canManageActions: true,
+          canManageSettings: true,
+          canManageFamily: true,
         },
         orderBy: { createdAt: 'asc' },
       });
@@ -63,16 +67,24 @@ export function createUserRepository(prisma: PrismaClient) {
       return prisma.user.update({ where: { id: userId }, data: { email } });
     },
 
-    setPasswordHash(userId: string, passwordHash: string) {
-      return prisma.user.update({ where: { id: userId }, data: { passwordHash } });
-    },
-
     setPinHash(userId: string, pinHash: string) {
       return prisma.user.update({ where: { id: userId }, data: { pinHash } });
     },
 
     deactivate(userId: string) {
       return prisma.user.update({ where: { id: userId }, data: { deactivatedAt: new Date() } });
+    },
+
+    setPermissions(
+      userId: string,
+      permissions: {
+        canManageMoney: boolean;
+        canManageActions: boolean;
+        canManageSettings: boolean;
+        canManageFamily: boolean;
+      },
+    ) {
+      return prisma.user.update({ where: { id: userId }, data: permissions });
     },
   };
 }

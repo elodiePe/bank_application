@@ -2,16 +2,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  changePasswordSchema,
   changePinSchema,
   setEmailSchema,
-  type ChangePasswordInput,
   type ChangePinInput,
   type SetEmailInput,
 } from '@banque-familiale/shared';
 import { useCurrentUser } from '../hooks/useAuth.js';
 import { useCurrentFamily } from '../hooks/useFamilyAuth.js';
-import { useChangeOwnPassword, useChangeOwnPin, useSetOwnEmail } from '../hooks/useMembers.js';
+import { useChangeOwnPin, useSetOwnEmail } from '../hooks/useMembers.js';
 import { ApiError } from '../services/api.js';
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -36,8 +34,7 @@ export function MyAccountSettings() {
         {user.role === 'PARENT' && (
           <EmailForm currentEmail={user.email} familyOwnerEmail={family?.ownerEmail ?? null} />
         )}
-        {user.role === 'PARENT' && <PasswordForm />}
-        {user.role === 'CHILD' && <PinForm />}
+        <PinForm />
       </div>
     </div>
   );
@@ -103,90 +100,6 @@ function EmailForm({
         <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(setEmail.error)}</p>
       )}
       {setEmail.isSuccess && <p className="text-sm text-green-600 dark:text-green-400">E-mail enregistré.</p>}
-    </form>
-  );
-}
-
-function PasswordForm() {
-  const [open, setOpen] = useState(false);
-  const changePassword = useChangeOwnPassword();
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ChangePasswordInput>({ resolver: zodResolver(changePasswordSchema) });
-
-  function onSubmit(values: ChangePasswordInput) {
-    changePassword.mutate(values, {
-      onSuccess: () => {
-        setOpen(false);
-        reset();
-      },
-    });
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="self-start text-sm text-brand-600 hover:underline dark:text-brand-400"
-      >
-        Changer mon mot de passe
-      </button>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-2">
-      <label className="text-sm font-medium" htmlFor="currentPassword">
-        Mot de passe actuel
-      </label>
-      <input
-        id="currentPassword"
-        type="password"
-        autoFocus
-        {...register('currentPassword')}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
-      />
-      {errors.currentPassword && (
-        <p className="text-sm text-red-600 dark:text-red-400">{errors.currentPassword.message}</p>
-      )}
-
-      <label className="text-sm font-medium" htmlFor="newPassword">
-        Nouveau mot de passe
-      </label>
-      <input
-        id="newPassword"
-        type="password"
-        {...register('newPassword')}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
-      />
-      {errors.newPassword && (
-        <p className="text-sm text-red-600 dark:text-red-400">{errors.newPassword.message}</p>
-      )}
-
-      {changePassword.isError && (
-        <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(changePassword.error)}</p>
-      )}
-
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={changePassword.isPending}
-          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
-        >
-          Enregistrer
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-sm text-slate-500 hover:underline dark:text-slate-400"
-        >
-          Annuler
-        </button>
-      </div>
     </form>
   );
 }

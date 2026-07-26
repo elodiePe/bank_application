@@ -1,5 +1,6 @@
 import { SUPPORTED_CURRENCIES } from '@banque-familiale/shared';
 import { useSettings, useUpdateCurrency } from '../hooks/useTransactionActions.js';
+import { Select } from './Select.js';
 
 export function CurrencySettings() {
   const settings = useSettings();
@@ -14,18 +15,13 @@ export function CurrencySettings() {
         Convertit le solde total et les soldes des enfants au taux de change actuel. L'historique
         des opérations reste toujours affiché dans sa devise d'origine ({'CHF'}).
       </p>
-      <select
+      <Select
         value={settings.data.currency}
-        onChange={(e) => updateCurrency.mutate({ currency: e.target.value as (typeof SUPPORTED_CURRENCIES)[number]['code'] })}
+        onChange={(v) => updateCurrency.mutate({ currency: v as (typeof SUPPORTED_CURRENCIES)[number]['code'] })}
         disabled={updateCurrency.isPending}
-        className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
-      >
-        {SUPPORTED_CURRENCIES.map((c) => (
-          <option key={c.code} value={c.code}>
-            {c.label}
-          </option>
-        ))}
-      </select>
+        wrapperClassName="mt-3"
+        options={SUPPORTED_CURRENCIES.map((c) => ({ value: c.code, label: c.label }))}
+      />
     </div>
   );
 }

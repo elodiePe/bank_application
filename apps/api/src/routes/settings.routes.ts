@@ -4,11 +4,13 @@ import { createSettingsService } from '../services/settingsService.js';
 import { createSettingsController } from '../controllers/settingsController.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { createRequirePermission } from '../middleware/requirePermission.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export function createSettingsRouter(prisma: PrismaClient) {
   const settingsService = createSettingsService(prisma);
   const controller = createSettingsController(settingsService);
+  const requirePermission = createRequirePermission(prisma);
 
   const router = Router();
   router.use(authenticate);
@@ -19,11 +21,13 @@ export function createSettingsRouter(prisma: PrismaClient) {
   router.put(
     '/interest-rate',
     requireRole('PARENT'),
+    requirePermission('canManageSettings'),
     asyncHandler((req, res) => controller.updateInterestRate(req, res)),
   );
   router.put(
     '/currency',
     requireRole('PARENT'),
+    requirePermission('canManageSettings'),
     asyncHandler((req, res) => controller.updateCurrency(req, res)),
   );
 

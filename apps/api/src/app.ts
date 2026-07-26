@@ -11,6 +11,7 @@ import { createTransactionActionsRouter } from './routes/transactionActions.rout
 import { createSettingsRouter } from './routes/settings.routes.js';
 import { createChildAccountRouter } from './routes/childAccount.routes.js';
 import { createMoneyRequestRouter } from './routes/moneyRequest.routes.js';
+import { createDisputeRouter } from './routes/dispute.routes.js';
 import { createNotificationRouter } from './routes/notification.routes.js';
 import { createMemberRouter } from './routes/member.routes.js';
 import { createFamilyAuthRouter } from './routes/familyAuth.routes.js';
@@ -41,6 +42,7 @@ export function createApp() {
   app.use('/settings', createSettingsRouter(prisma));
   app.use('/children', createChildAccountRouter(prisma));
   app.use('/money-requests', createMoneyRequestRouter(prisma));
+  app.use('/disputes', createDisputeRouter(prisma));
   app.use('/notifications', createNotificationRouter(prisma));
   app.use('/members', createMemberRouter(prisma));
   app.use('/stocks', createStockRouter(prisma));

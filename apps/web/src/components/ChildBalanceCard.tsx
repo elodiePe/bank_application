@@ -6,12 +6,11 @@ import { convertCents, useFxRate } from '../hooks/useFx.js';
 interface ChildBalanceCardProps {
   child: ChildBalanceSummary;
   index: number;
-  onDeposit: () => void;
-  onWithdraw: () => void;
-  onGiftStock: () => void;
+  onDeposit?: () => void;
+  onWithdraw?: () => void;
 }
 
-export function ChildBalanceCard({ child, index, onDeposit, onWithdraw, onGiftStock }: ChildBalanceCardProps) {
+export function ChildBalanceCard({ child, index, onDeposit, onWithdraw }: ChildBalanceCardProps) {
   const { currency, rate } = useFxRate();
   return (
     <motion.div
@@ -31,32 +30,30 @@ export function ChildBalanceCard({ child, index, onDeposit, onWithdraw, onGiftSt
           </span>
         </div>
       </div>
-      <div className="flex gap-1">
-        <button
-          type="button"
-          onClick={onGiftStock}
-          aria-label={`Offrir des actions à ${child.firstName}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-brand-700 hover:bg-brand-200 dark:bg-brand-900/40 dark:text-brand-400 dark:hover:bg-brand-900/70"
-        >
-          🎁
-        </button>
-        <button
-          type="button"
-          onClick={onDeposit}
-          aria-label={`Ajouter de l'argent à ${child.firstName}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/70"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          onClick={onWithdraw}
-          aria-label={`Retirer de l'argent à ${child.firstName}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/70"
-        >
-          −
-        </button>
-      </div>
+      {(onDeposit || onWithdraw) && (
+        <div className="flex gap-1">
+          {onDeposit && (
+            <button
+              type="button"
+              onClick={onDeposit}
+              aria-label={`Ajouter de l'argent à ${child.firstName}`}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/70"
+            >
+              +
+            </button>
+          )}
+          {onWithdraw && (
+            <button
+              type="button"
+              onClick={onWithdraw}
+              aria-label={`Retirer de l'argent à ${child.firstName}`}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/70"
+            >
+              −
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -9,11 +9,11 @@ const FAMILY_OWNER_PASSWORD = process.env.FAMILY_OWNER_PASSWORD ?? 'demo-owner-p
 
 /**
  * Demo credentials — for local development only, never used in a real deployment.
- * Parents log in with a password only (no PIN); children log in with a 4-digit PIN only.
+ * Every member — parent or child — logs in with a 4-digit PIN.
  */
 const DEMO_PARENTS = [
-  { firstName: 'Papa', password: 'papa1234', email: 'papa@banque-familiale.local' },
-  { firstName: 'Maman', password: 'maman1234', email: 'maman@banque-familiale.local' },
+  { firstName: 'Papa', pin: '1111', email: 'papa@banque-familiale.local' },
+  { firstName: 'Maman', pin: '2222', email: 'maman@banque-familiale.local' },
 ];
 
 const DEMO_CHILDREN = [
@@ -36,7 +36,7 @@ export async function seedDemoFamily(prisma: PrismaClient) {
       DEMO_PARENTS.map(async (parent) => ({
         firstName: parent.firstName,
         email: parent.email,
-        passwordHash: await bcrypt.hash(parent.password, SALT_ROUNDS),
+        pinHash: await bcrypt.hash(parent.pin, SALT_ROUNDS),
       })),
     ),
     Promise.all(
@@ -75,7 +75,7 @@ export async function seedDemoFamily(prisma: PrismaClient) {
         role: Role.PARENT,
         firstName: parent.firstName,
         email: parent.email,
-        passwordHash: parent.passwordHash,
+        pinHash: parent.pinHash,
       },
     });
   }

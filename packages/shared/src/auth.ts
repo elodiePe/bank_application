@@ -8,12 +8,6 @@ export const passwordSchema = z
   .string()
   .min(8, 'Le mot de passe doit contenir au moins 8 caractères');
 
-export const loginPasswordSchema = z.object({
-  userId: z.string().min(1),
-  password: z.string().min(1, 'Le mot de passe est requis'),
-});
-export type LoginPasswordInput = z.infer<typeof loginPasswordSchema>;
-
 export const loginPinSchema = z.object({
   userId: z.string().min(1),
   pin: pinSchema,
@@ -68,8 +62,18 @@ export interface FamilyMemberSummary {
   id: string;
   firstName: string;
   role: Role;
-  /** Whether this member can log in with a PIN (children always; parents only if they set one). */
+  /** Every member (parent or child) logs in with a PIN. */
   hasPinLogin: boolean;
+}
+
+/// The single fixed admin (first parent created for the family) always has full access
+/// regardless of the four booleans below, which only apply to non-admin parents.
+export interface ParentPermissions {
+  isAdmin: boolean;
+  canManageMoney: boolean;
+  canManageActions: boolean;
+  canManageSettings: boolean;
+  canManageFamily: boolean;
 }
 
 export interface AuthenticatedUser {
@@ -78,4 +82,6 @@ export interface AuthenticatedUser {
   firstName: string;
   role: Role;
   email: string | null;
+  /** Non-null for PARENT, null for CHILD. */
+  permissions: ParentPermissions | null;
 }

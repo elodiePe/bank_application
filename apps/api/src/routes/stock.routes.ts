@@ -4,11 +4,13 @@ import { createStockService } from '../services/stockService.js';
 import { createStockController } from '../controllers/stockController.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { createRequirePermission } from '../middleware/requirePermission.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export function createStockRouter(prisma: PrismaClient) {
   const stockService = createStockService(prisma);
   const controller = createStockController(stockService);
+  const requirePermission = createRequirePermission(prisma);
 
   const router = Router();
   router.use(authenticate);
@@ -47,6 +49,7 @@ export function createStockRouter(prisma: PrismaClient) {
   router.post(
     '/gift',
     requireRole('PARENT'),
+    requirePermission('canManageActions'),
     asyncHandler((req, res) => controller.gift(req, res)),
   );
   router.get(
@@ -62,11 +65,13 @@ export function createStockRouter(prisma: PrismaClient) {
   router.post(
     '/orders/:id/approve',
     requireRole('PARENT'),
+    requirePermission('canManageActions'),
     asyncHandler((req, res) => controller.approve(req, res)),
   );
   router.post(
     '/orders/:id/reject',
     requireRole('PARENT'),
+    requirePermission('canManageActions'),
     asyncHandler((req, res) => controller.reject(req, res)),
   );
   router.post(

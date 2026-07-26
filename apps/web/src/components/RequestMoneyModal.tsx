@@ -1,8 +1,9 @@
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { Sibling } from '@banque-familiale/shared';
 import { Modal } from './Modal.js';
+import { Select } from './Select.js';
 import { useCreateMoneyRequest } from '../hooks/useMoneyRequests.js';
 import { STORAGE_CURRENCY } from '../utils/currency.js';
 
@@ -23,6 +24,7 @@ export function RequestMoneyModal({ siblings, onClose }: { siblings: Sibling[]; 
   const createRequest = useCreateMoneyRequest();
   const {
     register,
+    control,
     handleSubmit,
     watch,
     formState: { errors },
@@ -50,33 +52,45 @@ export function RequestMoneyModal({ siblings, onClose }: { siblings: Sibling[]; 
         <label className="text-sm font-medium" htmlFor="type">
           Type de demande
         </label>
-        <select
-          id="type"
-          {...register('type')}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-        >
-          <option value="DEPOSIT_REQUEST">Demander de l'argent (aux parents)</option>
-          <option value="WITHDRAWAL_REQUEST">Demander un retrait en espèces</option>
-          <option value="TRANSFER_REQUEST">Demander à un frère/une sœur</option>
-        </select>
+        <Controller
+          name="type"
+          control={control}
+          render={({ field }) => (
+            <Select
+              id="type"
+              ariaLabel="Type de demande"
+              value={field.value}
+              onChange={field.onChange}
+              options={[
+                { value: 'DEPOSIT_REQUEST', label: "Demander de l'argent (aux parents)" },
+                { value: 'WITHDRAWAL_REQUEST', label: 'Demander un retrait en espèces' },
+                { value: 'TRANSFER_REQUEST', label: 'Demander à un frère/une sœur' },
+              ]}
+            />
+          )}
+        />
 
         {type === 'TRANSFER_REQUEST' && (
           <>
             <label className="text-sm font-medium" htmlFor="targetUserId">
               À qui ?
             </label>
-            <select
-              id="targetUserId"
-              {...register('targetUserId')}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-            >
-              <option value="">Choisir…</option>
-              {siblings.map((s) => (
-                <option key={s.userId} value={s.userId}>
-                  {s.firstName}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="targetUserId"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  id="targetUserId"
+                  ariaLabel="À qui ?"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  options={[
+                    { value: '', label: 'Choisir…' },
+                    ...siblings.map((s) => ({ value: s.userId, label: s.firstName })),
+                  ]}
+                />
+              )}
+            />
             {errors.targetUserId && (
               <p className="text-sm text-red-600 dark:text-red-400">{errors.targetUserId.message}</p>
             )}

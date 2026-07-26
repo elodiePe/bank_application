@@ -5,10 +5,10 @@ import type { FamilyMemberDetail } from '@banque-familiale/shared';
 import { createUserRepository } from '../repositories/userRepository.js';
 import { createRefreshSessionRepository } from '../repositories/refreshSessionRepository.js';
 import { createAuditLogRepository } from '../repositories/auditLogRepository.js';
-import { hashPassword, hashPin } from './authStrategies.js';
+import { hashPin } from './authStrategies.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { sendEmail } from './emailService.js';
-import { passwordChangedTemplate, resetMemberPasswordRequestTemplate } from '../emails/templates.js';
+import { pinChangedTemplate, resetMemberPinRequestTemplate } from '../emails/templates.js';
 import { signMemberActionToken, verifyMemberActionToken } from './tokenService.js';
 import { createNotificationService } from './notificationService.js';
 import { env } from '../utils/env.js';
@@ -18,18 +18,31 @@ function toDetail(u: {
   firstName: string;
   role: 'PARENT' | 'CHILD';
   email: string | null;
-  passwordHash: string | null;
   pinHash: string | null;
   deactivatedAt: Date | null;
+  isAdmin: boolean;
+  canManageMoney: boolean;
+  canManageActions: boolean;
+  canManageSettings: boolean;
+  canManageFamily: boolean;
 }): FamilyMemberDetail {
   return {
     id: u.id,
     firstName: u.firstName,
     role: u.role,
     email: u.email,
-    hasPasswordLogin: u.passwordHash !== null,
     hasPinLogin: u.pinHash !== null,
     isActive: u.deactivatedAt === null,
+    permissions:
+      u.role === 'PARENT'
+        ? {
+            isAdmin: u.isAdmin,
+            canManageMoney: u.canManageMoney,
+            canManageActions: u.canManageActions,
+            canManageSettings: u.canManageSettings,
+            canManageFamily: u.canManageFamily,
+          }
+        : null,
   };
 }
 
@@ -49,11 +62,14 @@ export function createMemberService(prisma: PrismaClient) {
     familyId: string;
     firstName: string;
     role: 'PARENT' | 'CHILD';
-    password?: string;
-    pin?: string;
+    pin: string;
+    isAdmin?: boolean;
+    canManageMoney?: boolean;
+    canManageActions?: boolean;
+    canManageSettings?: boolean;
+    canManageFamily?: boolean;
   }) {
-    const passwordHash = params.password ? await hashPassword(params.password) : null;
-    const pinHash = params.pin ? await hashPin(params.pin) : null;
+    const pinHash = await hashPin(params.pin);
     const id = randomUUID();
 
     return prisma.$transaction(async (tx) => {
@@ -63,8 +79,16 @@ export function createMemberService(prisma: PrismaClient) {
           familyId: params.familyId,
           role: params.role,
           firstName: params.firstName,
-          passwordHash,
           pinHash,
+          ...(params.role === 'PARENT'
+            ? {
+                isAdmin: params.isAdmin ?? false,
+                canManageMoney: params.canManageMoney ?? true,
+                canManageActions: params.canManageActions ?? true,
+                canManageSettings: params.canManageSettings ?? true,
+                canManageFamily: params.canManageFamily ?? true,
+              }
+            : {}),
         },
       });
       if (params.role === 'CHILD') {
@@ -95,25 +119,19 @@ export function createMemberService(prisma: PrismaClient) {
       await userRepo.setEmail(userId, email);
     },
 
-    async changeOwnPassword(params: { userId: string; currentPassword: string; newPassword: string }) {
-      const user = await userRepo.findById(params.userId);
-      if (!user || !user.passwordHash) throw new ForbiddenError();
-      const ok = await bcrypt.compare(params.currentPassword, user.passwordHash);
-      if (!ok) throw new ForbiddenError('Mot de passe actuel incorrect.');
-      await userRepo.setPasswordHash(params.userId, await hashPassword(params.newPassword));
-
-      if (user.email) {
-        const { subject, html } = passwordChangedTemplate({ firstName: user.firstName });
-        void sendEmail({ to: user.email, subject, html });
-      }
-    },
-
+    /// Every member — parent or child — authenticates with a PIN, so this one form covers
+    /// both roles now.
     async changeOwnPin(params: { userId: string; currentPin: string; newPin: string }) {
       const user = await userRepo.findById(params.userId);
       if (!user || !user.pinHash) throw new ForbiddenError();
       const ok = await bcrypt.compare(params.currentPin, user.pinHash);
       if (!ok) throw new ForbiddenError('Code PIN actuel incorrect.');
       await userRepo.setPinHash(params.userId, await hashPin(params.newPin));
+
+      if (user.role === 'PARENT' && user.email) {
+        const { subject, html } = pinChangedTemplate({ firstName: user.firstName });
+        void sendEmail({ to: user.email, subject, html });
+      }
     },
 
     async addFamilyMember(params: {
@@ -121,15 +139,21 @@ export function createMemberService(prisma: PrismaClient) {
       actorId: string;
       firstName: string;
       role: 'PARENT' | 'CHILD';
-      password?: string;
-      pin?: string;
+      pin: string;
+      canManageMoney?: boolean;
+      canManageActions?: boolean;
+      canManageSettings?: boolean;
+      canManageFamily?: boolean;
     }): Promise<FamilyMemberDetail> {
       const created = await createUser({
         familyId: params.familyId,
         firstName: params.firstName,
         role: params.role,
-        password: params.password,
         pin: params.pin,
+        canManageMoney: params.canManageMoney,
+        canManageActions: params.canManageActions,
+        canManageSettings: params.canManageSettings,
+        canManageFamily: params.canManageFamily,
       });
 
       await auditLogRepo.record({
@@ -153,7 +177,7 @@ export function createMemberService(prisma: PrismaClient) {
     async createFirstParent(params: {
       familyId: string;
       firstName: string;
-      password: string;
+      pin: string;
     }): Promise<FamilyMemberDetail> {
       const existing = await userRepo.listAllFamilyMembers(params.familyId);
       if (existing.length > 0) {
@@ -164,7 +188,8 @@ export function createMemberService(prisma: PrismaClient) {
         familyId: params.familyId,
         firstName: params.firstName,
         role: 'PARENT',
-        password: params.password,
+        pin: params.pin,
+        isAdmin: true,
       });
 
       await auditLogRepo.record({
@@ -181,30 +206,10 @@ export function createMemberService(prisma: PrismaClient) {
       return toDetail(detail);
     },
 
-    async resetCredential(params: {
-      familyId: string;
-      actorId: string;
-      targetUserId: string;
-      newPassword?: string;
-      newPin?: string;
-    }) {
+    async resetCredential(params: { familyId: string; actorId: string; targetUserId: string; newPin: string }) {
       const target = await assertBelongsToFamily(params.targetUserId, params.familyId);
 
-      if (params.newPassword) {
-        if (target.role !== 'PARENT') {
-          throw new ValidationError('Seuls les comptes parent ont un mot de passe.');
-        }
-        await userRepo.setPasswordHash(target.id, await hashPassword(params.newPassword));
-      }
-      if (params.newPin) {
-        if (target.role !== 'CHILD') {
-          throw new ValidationError('Les comptes parent n\'ont pas de code PIN.');
-        }
-        await userRepo.setPinHash(target.id, await hashPin(params.newPin));
-      }
-      if (!params.newPassword && !params.newPin) {
-        throw new ValidationError('Aucun nouveau mot de passe ni code PIN fourni.');
-      }
+      await userRepo.setPinHash(target.id, await hashPin(params.newPin));
 
       // Force re-login everywhere: a credential reset should invalidate existing sessions.
       await refreshSessionRepo.revokeAllForUser(target.id);
@@ -217,41 +222,43 @@ export function createMemberService(prisma: PrismaClient) {
       });
     },
 
-    /** A parent forgot their own password, before logging in — this is family-owner-scoped
-     * (not member-authenticated, since there is no active member session yet). */
-    async requestPasswordReset(familyId: string, targetUserId: string) {
+    /** A parent forgot their own PIN, before logging in — this is family-owner-scoped
+     * (not member-authenticated, since there is no active member session yet). Only
+     * parents have this self-service email flow; children have no email on file, so they
+     * use requestPinResetNotification below instead. */
+    async requestPinReset(familyId: string, targetUserId: string) {
       const target = await assertBelongsToFamily(targetUserId, familyId);
       if (target.role !== 'PARENT') {
-        throw new ValidationError('Seuls les comptes parent ont un mot de passe.');
+        throw new ValidationError('Seuls les comptes parent peuvent réinitialiser leur code par e-mail.');
       }
       if (!target.email) {
         throw new ValidationError(
-          "Aucune adresse e-mail n'est enregistrée pour ce compte. Demande à un autre parent de réinitialiser ton mot de passe.",
+          "Aucune adresse e-mail n'est enregistrée pour ce compte. Demande à un autre parent de réinitialiser ton code PIN.",
         );
       }
 
-      const resetToken = signMemberActionToken({ userId: target.id, action: 'reset-password' });
-      const { subject, html } = resetMemberPasswordRequestTemplate({
+      const resetToken = signMemberActionToken({ userId: target.id, action: 'reset-pin' });
+      const { subject, html } = resetMemberPinRequestTemplate({
         firstName: target.firstName,
         resetUrl: `${env.webAppUrl}/reset-password?type=member&token=${resetToken}`,
       });
       await sendEmail({ to: target.email, subject, html });
     },
 
-    async confirmPasswordReset(params: { token: string; newPassword: string }) {
+    async confirmPinReset(params: { token: string; newPin: string }) {
       const payload = verifyMemberActionToken(params.token);
-      if (!payload || payload.action !== 'reset-password') {
+      if (!payload || payload.action !== 'reset-pin') {
         throw new ValidationError('Ce lien de réinitialisation est invalide ou a expiré.');
       }
 
       const user = await userRepo.findById(payload.userId);
       if (!user) throw new NotFoundError('Membre introuvable');
 
-      await userRepo.setPasswordHash(user.id, await hashPassword(params.newPassword));
+      await userRepo.setPinHash(user.id, await hashPin(params.newPin));
       await refreshSessionRepo.revokeAllForUser(user.id);
 
       if (user.email) {
-        const { subject, html } = passwordChangedTemplate({ firstName: user.firstName });
+        const { subject, html } = pinChangedTemplate({ firstName: user.firstName });
         void sendEmail({ to: user.email, subject, html });
       }
     },
@@ -262,13 +269,66 @@ export function createMemberService(prisma: PrismaClient) {
     async requestPinResetNotification(familyId: string, targetUserId: string) {
       const target = await assertBelongsToFamily(targetUserId, familyId);
       if (target.role !== 'CHILD') {
-        throw new ValidationError("Les comptes parent n'ont pas de code PIN.");
+        throw new ValidationError("Les parents utilisent le lien envoyé par e-mail pour réinitialiser leur code.");
       }
 
       await notificationService.notifyParentsOfCredentialResetRequest({
         familyId,
         requesterFirstName: target.firstName,
       });
+    },
+
+    /** Admin-only: change what a non-admin parent is allowed to do. The admin flag itself
+     * is fixed to the first parent and can't be reassigned here. */
+    async updatePermissions(params: {
+      familyId: string;
+      actorId: string;
+      targetUserId: string;
+      canManageMoney: boolean;
+      canManageActions: boolean;
+      canManageSettings: boolean;
+      canManageFamily: boolean;
+    }): Promise<FamilyMemberDetail> {
+      const actor = await userRepo.findById(params.actorId);
+      if (!actor || !actor.isAdmin) {
+        throw new ForbiddenError('Seul l\'administrateur peut modifier les droits des parents.');
+      }
+      if (params.actorId === params.targetUserId) {
+        throw new ForbiddenError('Impossible de modifier ses propres droits.');
+      }
+
+      const target = await assertBelongsToFamily(params.targetUserId, params.familyId);
+      if (target.role !== 'PARENT') {
+        throw new ValidationError('Seuls les comptes parent ont des droits à configurer.');
+      }
+      if (target.isAdmin) {
+        throw new ForbiddenError("Impossible de modifier les droits de l'administrateur.");
+      }
+
+      await userRepo.setPermissions(target.id, {
+        canManageMoney: params.canManageMoney,
+        canManageActions: params.canManageActions,
+        canManageSettings: params.canManageSettings,
+        canManageFamily: params.canManageFamily,
+      });
+
+      await auditLogRepo.record({
+        actorId: params.actorId,
+        action: 'MEMBER_PERMISSIONS_UPDATED',
+        entityType: 'User',
+        entityId: target.id,
+        metadata: {
+          canManageMoney: params.canManageMoney,
+          canManageActions: params.canManageActions,
+          canManageSettings: params.canManageSettings,
+          canManageFamily: params.canManageFamily,
+        },
+      });
+
+      const full = await userRepo.listAllFamilyMembers(params.familyId);
+      const detail = full.find((m) => m.id === target.id);
+      if (!detail) throw new NotFoundError();
+      return toDetail(detail);
     },
 
     async deactivateMember(params: {

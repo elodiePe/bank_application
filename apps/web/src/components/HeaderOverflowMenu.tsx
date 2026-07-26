@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface HeaderOverflowMenuProps {
@@ -14,6 +14,8 @@ interface HeaderOverflowMenuProps {
 /// Desktop keeps the actions as individual buttons, so this component is never rendered there.
 export function HeaderOverflowMenu({ theme, onToggleTheme, onLogout, logoutPending }: HeaderOverflowMenuProps) {
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  const isSettingsActive = pathname === '/settings';
 
   return (
     <div className="relative">
@@ -42,8 +44,13 @@ export function HeaderOverflowMenu({ theme, onToggleTheme, onLogout, logoutPendi
               <Link
                 to="/settings"
                 role="menuitem"
+                aria-current={isSettingsActive ? 'page' : undefined}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                className={
+                  isSettingsActive
+                    ? 'flex items-center gap-2 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-400'
+                    : 'flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-800'
+                }
               >
                 <span aria-hidden>⚙️</span>
                 Paramètres

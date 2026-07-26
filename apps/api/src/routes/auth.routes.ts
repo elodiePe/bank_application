@@ -30,12 +30,6 @@ export function createAuthRouter(prisma: PrismaClient) {
     asyncHandler((req, res) => controller.listMembers(req, res)),
   );
   router.post(
-    '/login-password',
-    requireFamilyOwner,
-    loginRateLimiter,
-    asyncHandler((req, res) => controller.loginPassword(req, res)),
-  );
-  router.post(
     '/login-pin',
     requireFamilyOwner,
     loginRateLimiter,

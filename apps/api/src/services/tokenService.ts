@@ -89,15 +89,15 @@ export function verifyEmailActionToken(token: string): EmailActionPayload | null
 }
 
 /** Same purpose as EmailActionPayload but addressed to a single family member's own
- * account (User.passwordHash) rather than the family-owner login — the two are separate
+ * account (User.pinHash) rather than the family-owner login — the two are separate
  * identity domains, so this can't reuse EmailActionPayload's {familyId, email} shape. */
 export interface MemberActionPayload {
   userId: string;
-  action: 'reset-password';
+  action: 'reset-pin';
 }
 
 const MEMBER_ACTION_TTL_SECONDS: Record<MemberActionPayload['action'], number> = {
-  'reset-password': 60 * 60,
+  'reset-pin': 60 * 60,
 };
 
 export function signMemberActionToken(payload: MemberActionPayload): string {

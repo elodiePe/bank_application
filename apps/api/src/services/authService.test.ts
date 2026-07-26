@@ -33,12 +33,12 @@ describe('authService (seeded demo family)', () => {
     const members = await authService.listFamilyMembers(FAMILY_ID);
     expect(members).toHaveLength(5);
     const papa = members.find((m) => m.id === 'demo-papa');
-    expect(papa).toMatchObject({ firstName: 'Papa', role: 'PARENT', hasPinLogin: false });
+    expect(papa).toMatchObject({ firstName: 'Papa', role: 'PARENT', hasPinLogin: true });
     expect(papa).not.toHaveProperty('passwordHash');
   });
 
-  it('logs a parent in with the correct password and issues tokens', async () => {
-    const result = await authService.loginWithPassword('demo-papa', 'papa1234', FAMILY_ID);
+  it('logs a parent in with the correct PIN and issues tokens', async () => {
+    const result = await authService.loginWithPin('demo-papa', '1111', FAMILY_ID);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.user).toMatchObject({ id: 'demo-papa', role: 'PARENT', firstName: 'Papa' });
@@ -46,14 +46,9 @@ describe('authService (seeded demo family)', () => {
     expect(result.tokens.refreshToken).toBeTruthy();
   });
 
-  it('rejects a wrong password', async () => {
-    const result = await authService.loginWithPassword('demo-maman', 'wrong-password', FAMILY_ID);
+  it('rejects a wrong PIN', async () => {
+    const result = await authService.loginWithPin('demo-maman', '0000', FAMILY_ID);
     expect(result).toEqual({ ok: false, reason: 'invalid_credential' });
-  });
-
-  it('refuses password login for a child (children only use a PIN)', async () => {
-    const result = await authService.loginWithPassword('demo-elodie', 'anything', FAMILY_ID);
-    expect(result).toEqual({ ok: false, reason: 'wrong_role' });
   });
 
   it('logs a child in with the correct PIN', async () => {
@@ -64,7 +59,7 @@ describe('authService (seeded demo family)', () => {
   });
 
   it('refuses a login attempt where the userId belongs to a different family (multi-tenant isolation)', async () => {
-    const result = await authService.loginWithPassword('demo-papa', 'papa1234', 'some-other-family');
+    const result = await authService.loginWithPin('demo-papa', '1111', 'some-other-family');
     expect(result).toEqual({ ok: false, reason: 'not_found' });
   });
 
@@ -94,7 +89,7 @@ describe('authService (seeded demo family)', () => {
   });
 
   it('revokes the session on logout so it can no longer be refreshed', async () => {
-    const login = await authService.loginWithPassword('demo-papa', 'papa1234', FAMILY_ID);
+    const login = await authService.loginWithPin('demo-papa', '1111', FAMILY_ID);
     expect(login.ok).toBe(true);
     if (!login.ok) return;
 

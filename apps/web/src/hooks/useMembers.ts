@@ -1,26 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AddMemberInput,
-  ChangePasswordInput,
   ChangePinInput,
-  ConfirmMemberPasswordResetInput,
+  ConfirmMemberPinResetInput,
   DeactivateMemberInput,
-  ResetPasswordInput,
   ResetPinInput,
   SetEmailInput,
+  UpdatePermissionsInput,
 } from '@banque-familiale/shared';
 import {
   addMember,
-  changeOwnPassword,
   changeOwnPin,
-  confirmMemberPasswordReset,
+  confirmMemberPinReset,
   deactivateMember,
   fetchMembers,
-  requestMemberPasswordReset,
+  requestMemberPinReset,
   requestPinResetNotification,
-  resetMemberPassword,
   resetMemberPin,
   setOwnEmail,
+  updateMemberPermissions,
 } from '../services/member.service.js';
 import { useInvalidateCurrentUser } from './useAuth.js';
 
@@ -47,10 +45,6 @@ export function useSetOwnEmail() {
   });
 }
 
-export function useChangeOwnPassword() {
-  return useMutation({ mutationFn: (input: ChangePasswordInput) => changeOwnPassword(input) });
-}
-
 export function useChangeOwnPin() {
   return useMutation({ mutationFn: (input: ChangePinInput) => changeOwnPin(input) });
 }
@@ -63,13 +57,6 @@ export function useAddMember() {
   });
 }
 
-export function useResetMemberPassword() {
-  return useMutation({
-    mutationFn: ({ memberId, input }: { memberId: string; input: ResetPasswordInput }) =>
-      resetMemberPassword(memberId, input),
-  });
-}
-
 export function useResetMemberPin() {
   return useMutation({
     mutationFn: ({ memberId, input }: { memberId: string; input: ResetPinInput }) =>
@@ -77,18 +64,27 @@ export function useResetMemberPin() {
   });
 }
 
-export function useRequestMemberPasswordReset() {
-  return useMutation({ mutationFn: (memberId: string) => requestMemberPasswordReset(memberId) });
+export function useRequestMemberPinReset() {
+  return useMutation({ mutationFn: (memberId: string) => requestMemberPinReset(memberId) });
 }
 
-export function useConfirmMemberPasswordReset() {
+export function useConfirmMemberPinReset() {
   return useMutation({
-    mutationFn: (input: ConfirmMemberPasswordResetInput) => confirmMemberPasswordReset(input),
+    mutationFn: (input: ConfirmMemberPinResetInput) => confirmMemberPinReset(input),
   });
 }
 
 export function useRequestPinResetNotification() {
   return useMutation({ mutationFn: (memberId: string) => requestPinResetNotification(memberId) });
+}
+
+export function useUpdateMemberPermissions() {
+  const invalidateMembers = useInvalidateMembers();
+  return useMutation({
+    mutationFn: ({ memberId, input }: { memberId: string; input: UpdatePermissionsInput }) =>
+      updateMemberPermissions(memberId, input),
+    onSuccess: invalidateMembers,
+  });
 }
 
 export function useDeactivateMember() {

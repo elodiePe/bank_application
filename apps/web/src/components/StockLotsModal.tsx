@@ -49,8 +49,7 @@ export function StockLotsModal({ symbol, companyName, onClose }: StockLotsModalP
                 </div>
                 <div className="mt-1 flex items-center justify-between text-slate-500 dark:text-slate-400">
                   <span>
-                    {formatMoney(lot.pricePerShareCents, STOCK_CURRENCY)}/titre ·{' '}
-                    {formatMoney(lot.totalCents, STOCK_CURRENCY)} au total
+                    {formatMoney(lot.pricePerShareCents, STOCK_CURRENCY)}/titre
                   </span>
                   {lot.gainLossCents !== null && (
                     <span
@@ -66,9 +65,9 @@ export function StockLotsModal({ symbol, companyName, onClose }: StockLotsModalP
                     </span>
                   )}
                 </div>
-                {lot.comment && (
+                {/* {lot.comment && (
                   <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{lot.comment}</p>
-                )}
+                )} */}
               </li>
             ))}
           </ul>

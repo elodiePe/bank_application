@@ -2,13 +2,12 @@ import type { Request, Response } from 'express';
 import {
   addMemberSchema,
   bootstrapParentSchema,
-  changePasswordSchema,
   changePinSchema,
-  confirmMemberPasswordResetSchema,
+  confirmMemberPinResetSchema,
   deactivateMemberSchema,
-  resetPasswordSchema,
   resetPinSchema,
   setEmailSchema,
+  updatePermissionsSchema,
 } from '@banque-familiale/shared';
 import type { MemberService } from '../services/memberService.js';
 import { ValidationError } from '../utils/errors.js';
@@ -28,14 +27,6 @@ export function createMemberController(memberService: MemberService) {
       res.status(204).end();
     },
 
-    async changeOwnPassword(req: Request, res: Response) {
-      const parsed = changePasswordSchema.safeParse(req.body);
-      if (!parsed.success) throw new ValidationError(parsed.error.message);
-
-      await memberService.changeOwnPassword({ userId: req.auth!.sub, ...parsed.data });
-      res.status(204).end();
-    },
-
     async changeOwnPin(req: Request, res: Response) {
       const parsed = changePinSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.message);
@@ -51,7 +42,7 @@ export function createMemberController(memberService: MemberService) {
       const member = await memberService.createFirstParent({
         familyId: req.familyOwner!.familyId,
         firstName: parsed.data.firstName,
-        password: parsed.data.password,
+        pin: parsed.data.pin,
       });
       res.status(201).json(member);
     },
@@ -65,23 +56,26 @@ export function createMemberController(memberService: MemberService) {
         actorId: req.auth!.sub,
         firstName: parsed.data.firstName,
         role: parsed.data.role,
-        password: parsed.data.password,
         pin: parsed.data.pin,
+        canManageMoney: parsed.data.canManageMoney,
+        canManageActions: parsed.data.canManageActions,
+        canManageSettings: parsed.data.canManageSettings,
+        canManageFamily: parsed.data.canManageFamily,
       });
       res.status(201).json(member);
     },
 
-    async resetPassword(req: Request, res: Response) {
-      const parsed = resetPasswordSchema.safeParse(req.body);
+    async updatePermissions(req: Request, res: Response) {
+      const parsed = updatePermissionsSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.message);
 
-      await memberService.resetCredential({
+      const member = await memberService.updatePermissions({
         familyId: req.auth!.familyId,
         actorId: req.auth!.sub,
         targetUserId: String(req.params.id),
-        newPassword: parsed.data.newPassword,
+        ...parsed.data,
       });
-      res.status(204).end();
+      res.json(member);
     },
 
     async resetPin(req: Request, res: Response) {
@@ -97,16 +91,16 @@ export function createMemberController(memberService: MemberService) {
       res.status(204).end();
     },
 
-    async requestPasswordReset(req: Request, res: Response) {
-      await memberService.requestPasswordReset(req.familyOwner!.familyId, String(req.params.id));
+    async requestPinReset(req: Request, res: Response) {
+      await memberService.requestPinReset(req.familyOwner!.familyId, String(req.params.id));
       res.status(204).end();
     },
 
-    async confirmPasswordReset(req: Request, res: Response) {
-      const parsed = confirmMemberPasswordResetSchema.safeParse(req.body);
+    async confirmPinReset(req: Request, res: Response) {
+      const parsed = confirmMemberPinResetSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.message);
 
-      await memberService.confirmPasswordReset(parsed.data);
+      await memberService.confirmPinReset(parsed.data);
       res.status(204).end();
     },
 

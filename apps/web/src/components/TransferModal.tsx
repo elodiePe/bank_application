@@ -1,8 +1,9 @@
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { ChildBalanceSummary } from '@banque-familiale/shared';
 import { Modal } from './Modal.js';
+import { Select } from './Select.js';
 import { useTransfer } from '../hooks/useTransactionActions.js';
 import { STORAGE_CURRENCY } from '../utils/currency.js';
 import { ApiError } from '../services/api.js';
@@ -35,6 +36,7 @@ export function TransferModal({ children, onClose }: TransferModalProps) {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<FormValues>({
@@ -60,32 +62,34 @@ export function TransferModal({ children, onClose }: TransferModalProps) {
         <label className="text-sm font-medium" htmlFor="fromAccountId">
           De
         </label>
-        <select
-          id="fromAccountId"
-          {...register('fromAccountId')}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-        >
-          {children.map((c) => (
-            <option key={c.accountId} value={c.accountId}>
-              {c.firstName}
-            </option>
-          ))}
-        </select>
+        <Controller
+          name="fromAccountId"
+          control={control}
+          render={({ field }) => (
+            <Select
+              id="fromAccountId"
+              value={field.value}
+              onChange={field.onChange}
+              options={children.map((c) => ({ value: c.accountId, label: c.firstName }))}
+            />
+          )}
+        />
 
         <label className="text-sm font-medium" htmlFor="toAccountId">
           Vers
         </label>
-        <select
-          id="toAccountId"
-          {...register('toAccountId')}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-        >
-          {children.map((c) => (
-            <option key={c.accountId} value={c.accountId}>
-              {c.firstName}
-            </option>
-          ))}
-        </select>
+        <Controller
+          name="toAccountId"
+          control={control}
+          render={({ field }) => (
+            <Select
+              id="toAccountId"
+              value={field.value}
+              onChange={field.onChange}
+              options={children.map((c) => ({ value: c.accountId, label: c.firstName }))}
+            />
+          )}
+        />
         {errors.toAccountId && (
           <p className="text-sm text-red-600 dark:text-red-400">{errors.toAccountId.message}</p>
         )}
