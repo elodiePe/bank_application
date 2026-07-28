@@ -83,7 +83,7 @@ export function MoneyActionModal({ mode, accountId, childFirstName, onClose }: M
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {mutation.isPending ? 'Envoi…' : 'Confirmer'}
         </button>

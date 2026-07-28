@@ -48,7 +48,7 @@ export function TimelineCard({ transaction: t, index, showChildName, onCorrect, 
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index, 10) * 0.03 }}
       whileHover={{ scale: 1.01 }}
-      className={`rounded-2xl border border-slate-200 p-4 shadow-sm dark:border-slate-800 ${TRANSACTION_TYPE_BG_CLASSES[t.type]}`}
+      className={`rounded-2xl border border-slate-200 p-4 shadow-sm dark:border-slate-700 ${TRANSACTION_TYPE_BG_CLASSES[t.type]}`}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 truncate font-medium">

@@ -5,6 +5,16 @@ import { createUserRepository } from '../repositories/userRepository.js';
 import { createPushService } from './pushService.js';
 import { formatChf } from '../utils/currency.js';
 
+// In-app routes a push notification can deep-link to, so tapping it opens the page the
+// notification is actually about instead of just the app root.
+const ROUTE = {
+  accueil: '/home',
+  argent: '/dashboard',
+  actions: '/dashboard?tab=stocks',
+  maison: '/chores',
+  parametres: '/settings',
+} as const;
+
 function toSummary(n: {
   id: string;
   type: NotificationSummary['type'];
@@ -15,6 +25,8 @@ function toSummary(n: {
   relatedTransactionId: string | null;
   relatedMoneyRequestId: string | null;
   relatedDisputeId: string | null;
+  relatedChoreCompletionId: string | null;
+  relatedChoreId: string | null;
 }): NotificationSummary {
   return {
     id: n.id,
@@ -26,6 +38,8 @@ function toSummary(n: {
     relatedTransactionId: n.relatedTransactionId,
     relatedMoneyRequestId: n.relatedMoneyRequestId,
     relatedDisputeId: n.relatedDisputeId,
+    relatedChoreCompletionId: n.relatedChoreCompletionId,
+    relatedChoreId: n.relatedChoreId,
   };
 }
 
@@ -34,16 +48,17 @@ export function createNotificationService(prisma: PrismaClient) {
   const userRepo = createUserRepository(prisma);
   const pushService = createPushService(prisma);
 
-  /** Writes the in-app notification, then best-effort pushes the same content to the device. */
-  async function createAndPush(data: Parameters<typeof notificationRepo.create>[0]) {
+  /** Writes the in-app notification, then best-effort pushes the same content to the device.
+   * `url` is push-only (never persisted) — it's what the OS notification deep-links to. */
+  async function createAndPush(data: Parameters<typeof notificationRepo.create>[0], url: string) {
     await notificationRepo.create(data);
-    await pushService.sendToUser(data.userId, { title: data.title, body: data.body });
+    await pushService.sendToUser(data.userId, { title: data.title, body: data.body, url });
   }
 
-  async function createManyAndPush(data: Parameters<typeof notificationRepo.createMany>[0]) {
+  async function createManyAndPush(data: Parameters<typeof notificationRepo.createMany>[0], url: string) {
     await notificationRepo.createMany(data);
     await Promise.allSettled(
-      data.map((n) => pushService.sendToUser(n.userId, { title: n.title, body: n.body })),
+      data.map((n) => pushService.sendToUser(n.userId, { title: n.title, body: n.body, url })),
     );
   }
 
@@ -84,6 +99,7 @@ export function createNotificationService(prisma: PrismaClient) {
           body: `${params.requesterFirstName} demande un ${params.isWithdrawal ? 'retrait' : 'dépôt'} de ${formatChf(params.amountCents)}.`,
           relatedMoneyRequestId: params.moneyRequestId,
         })),
+        ROUTE.accueil,
       );
     },
 
@@ -93,13 +109,16 @@ export function createNotificationService(prisma: PrismaClient) {
       amountCents: number;
       moneyRequestId: string;
     }) {
-      await createAndPush({
-        userId: params.targetUserId,
-        type: 'MONEY_REQUEST_CREATED',
-        title: `${params.requesterFirstName} te demande de l'argent`,
-        body: `${params.requesterFirstName} te demande ${formatChf(params.amountCents)}.`,
-        relatedMoneyRequestId: params.moneyRequestId,
-      });
+      await createAndPush(
+        {
+          userId: params.targetUserId,
+          type: 'MONEY_REQUEST_CREATED',
+          title: `${params.requesterFirstName} te demande de l'argent`,
+          body: `${params.requesterFirstName} te demande ${formatChf(params.amountCents)}.`,
+          relatedMoneyRequestId: params.moneyRequestId,
+        },
+        ROUTE.accueil,
+      );
     },
 
     async notifyRequestApproved(params: {
@@ -108,13 +127,16 @@ export function createNotificationService(prisma: PrismaClient) {
       approvedByFirstName: string;
       moneyRequestId: string;
     }) {
-      await createAndPush({
-        userId: params.requesterId,
-        type: 'MONEY_REQUEST_APPROVED',
-        title: 'Ta demande a été acceptée',
-        body: `${params.approvedByFirstName} a accepté ta demande de ${formatChf(params.amountCents)}.`,
-        relatedMoneyRequestId: params.moneyRequestId,
-      });
+      await createAndPush(
+        {
+          userId: params.requesterId,
+          type: 'MONEY_REQUEST_APPROVED',
+          title: 'Ta demande a été acceptée',
+          body: `${params.approvedByFirstName} a accepté ta demande de ${formatChf(params.amountCents)}.`,
+          relatedMoneyRequestId: params.moneyRequestId,
+        },
+        ROUTE.accueil,
+      );
     },
 
     async notifyRequestRejected(params: {
@@ -123,33 +145,42 @@ export function createNotificationService(prisma: PrismaClient) {
       rejectedByFirstName: string;
       moneyRequestId: string;
     }) {
-      await createAndPush({
-        userId: params.requesterId,
-        type: 'MONEY_REQUEST_REJECTED',
-        title: 'Ta demande a été refusée',
-        body: `${params.rejectedByFirstName} a refusé ta demande de ${formatChf(params.amountCents)}.`,
-        relatedMoneyRequestId: params.moneyRequestId,
-      });
+      await createAndPush(
+        {
+          userId: params.requesterId,
+          type: 'MONEY_REQUEST_REJECTED',
+          title: 'Ta demande a été refusée',
+          body: `${params.rejectedByFirstName} a refusé ta demande de ${formatChf(params.amountCents)}.`,
+          relatedMoneyRequestId: params.moneyRequestId,
+        },
+        ROUTE.accueil,
+      );
     },
 
     async notifyDeposit(params: { userId: string; amountCents: number; transactionId: string }) {
-      await createAndPush({
-        userId: params.userId,
-        type: 'DEPOSIT_RECEIVED',
-        title: 'Dépôt reçu',
-        body: `${formatChf(params.amountCents)} ont été ajoutés à ton compte.`,
-        relatedTransactionId: params.transactionId,
-      });
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'DEPOSIT_RECEIVED',
+          title: 'Dépôt reçu',
+          body: `${formatChf(params.amountCents)} ont été ajoutés à ton compte.`,
+          relatedTransactionId: params.transactionId,
+        },
+        ROUTE.argent,
+      );
     },
 
     async notifyWithdrawal(params: { userId: string; amountCents: number; transactionId: string }) {
-      await createAndPush({
-        userId: params.userId,
-        type: 'WITHDRAWAL_PROCESSED',
-        title: 'Retrait effectué',
-        body: `${formatChf(params.amountCents)} ont été retirés de ton compte.`,
-        relatedTransactionId: params.transactionId,
-      });
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'WITHDRAWAL_PROCESSED',
+          title: 'Retrait effectué',
+          body: `${formatChf(params.amountCents)} ont été retirés de ton compte.`,
+          relatedTransactionId: params.transactionId,
+        },
+        ROUTE.argent,
+      );
     },
 
     async notifyTransfer(params: {
@@ -160,42 +191,51 @@ export function createNotificationService(prisma: PrismaClient) {
       amountCents: number;
       transactionId: string;
     }) {
-      await createManyAndPush([
-        {
-          userId: params.fromUserId,
-          type: 'TRANSFER_RECEIVED',
-          title: 'Virement envoyé',
-          body: `Tu as envoyé ${formatChf(params.amountCents)} à ${params.toFirstName}.`,
-          relatedTransactionId: params.transactionId,
-        },
-        {
-          userId: params.toUserId,
-          type: 'TRANSFER_RECEIVED',
-          title: 'Virement reçu',
-          body: `Tu as reçu ${formatChf(params.amountCents)} de ${params.fromFirstName}.`,
-          relatedTransactionId: params.transactionId,
-        },
-      ]);
+      await createManyAndPush(
+        [
+          {
+            userId: params.fromUserId,
+            type: 'TRANSFER_RECEIVED',
+            title: 'Virement envoyé',
+            body: `Tu as envoyé ${formatChf(params.amountCents)} à ${params.toFirstName}.`,
+            relatedTransactionId: params.transactionId,
+          },
+          {
+            userId: params.toUserId,
+            type: 'TRANSFER_RECEIVED',
+            title: 'Virement reçu',
+            body: `Tu as reçu ${formatChf(params.amountCents)} de ${params.fromFirstName}.`,
+            relatedTransactionId: params.transactionId,
+          },
+        ],
+        ROUTE.argent,
+      );
     },
 
     async notifyCorrection(params: { userId: string; amountCents: number; transactionId: string }) {
-      await createAndPush({
-        userId: params.userId,
-        type: 'CORRECTION_APPLIED',
-        title: 'Correction sur ton compte',
-        body: `Une opération a été corrigée sur ton compte (${formatChf(params.amountCents)}).`,
-        relatedTransactionId: params.transactionId,
-      });
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'CORRECTION_APPLIED',
+          title: 'Correction sur ton compte',
+          body: `Une opération a été corrigée sur ton compte (${formatChf(params.amountCents)}).`,
+          relatedTransactionId: params.transactionId,
+        },
+        ROUTE.argent,
+      );
     },
 
     async notifyInterest(params: { userId: string; amountCents: number; transactionId: string }) {
-      await createAndPush({
-        userId: params.userId,
-        type: 'INTEREST_APPLIED',
-        title: 'Intérêts versés',
-        body: `Tu as gagné ${formatChf(params.amountCents)} d'intérêts ce mois-ci.`,
-        relatedTransactionId: params.transactionId,
-      });
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'INTEREST_APPLIED',
+          title: 'Intérêts versés',
+          body: `Tu as gagné ${formatChf(params.amountCents)} d'intérêts ce mois-ci.`,
+          relatedTransactionId: params.transactionId,
+        },
+        ROUTE.argent,
+      );
     },
 
     async notifyParentsOfStockOrder(params: {
@@ -217,6 +257,7 @@ export function createNotificationService(prisma: PrismaClient) {
           title: `${params.requesterFirstName} propose un ordre en bourse`,
           body: `${params.requesterFirstName} veut ${verb} ${params.quantity} ${params.symbol}.`,
         })),
+        ROUTE.actions,
       );
     },
 
@@ -228,12 +269,15 @@ export function createNotificationService(prisma: PrismaClient) {
       approvedByFirstName: string;
     }) {
       const verb = params.type === 'BUY' ? 'achat' : 'vente';
-      await createAndPush({
-        userId: params.requesterId,
-        type: 'STOCK_ORDER_APPROVED',
-        title: 'Ton ordre en bourse a été accepté',
-        body: `${params.approvedByFirstName} a accepté ton ordre d'${verb} de ${params.quantity} ${params.symbol}.`,
-      });
+      await createAndPush(
+        {
+          userId: params.requesterId,
+          type: 'STOCK_ORDER_APPROVED',
+          title: 'Ton ordre en bourse a été accepté',
+          body: `${params.approvedByFirstName} a accepté ton ordre d'${verb} de ${params.quantity} ${params.symbol}.`,
+        },
+        ROUTE.actions,
+      );
     },
 
     async notifyStockOrderRejected(params: {
@@ -244,12 +288,15 @@ export function createNotificationService(prisma: PrismaClient) {
       rejectedByFirstName: string;
     }) {
       const verb = params.type === 'BUY' ? 'achat' : 'vente';
-      await createAndPush({
-        userId: params.requesterId,
-        type: 'STOCK_ORDER_REJECTED',
-        title: 'Ton ordre en bourse a été refusé',
-        body: `${params.rejectedByFirstName} a refusé ton ordre d'${verb} de ${params.quantity} ${params.symbol}.`,
-      });
+      await createAndPush(
+        {
+          userId: params.requesterId,
+          type: 'STOCK_ORDER_REJECTED',
+          title: 'Ton ordre en bourse a été refusé',
+          body: `${params.rejectedByFirstName} a refusé ton ordre d'${verb} de ${params.quantity} ${params.symbol}.`,
+        },
+        ROUTE.actions,
+      );
     },
 
     async notifyParentsOfCredentialResetRequest(params: { familyId: string; requesterFirstName: string }) {
@@ -264,6 +311,7 @@ export function createNotificationService(prisma: PrismaClient) {
           title: `${params.requesterFirstName} a oublié son code`,
           body: `${params.requesterFirstName} a besoin d'un nouveau code PIN. Réinitialise-le depuis « Gestion de la famille ».`,
         })),
+        ROUTE.parametres,
       );
     },
 
@@ -285,17 +333,145 @@ export function createNotificationService(prisma: PrismaClient) {
           body: `${params.childFirstName} pense qu'une opération de ${formatChf(params.amountCents)} est incorrecte.`,
           relatedDisputeId: params.disputeId,
         })),
+        ROUTE.accueil,
       );
     },
 
     async notifyDisputeDismissed(params: { childId: string; dismissedByFirstName: string; disputeId: string }) {
-      await createAndPush({
-        userId: params.childId,
-        type: 'DISPUTE_DISMISSED',
-        title: 'Ton signalement a été examiné',
-        body: `${params.dismissedByFirstName} a vérifié ton signalement — l'opération reste inchangée.`,
-        relatedDisputeId: params.disputeId,
-      });
+      await createAndPush(
+        {
+          userId: params.childId,
+          type: 'DISPUTE_DISMISSED',
+          title: 'Ton signalement a été examiné',
+          body: `${params.dismissedByFirstName} a vérifié ton signalement — l'opération reste inchangée.`,
+          relatedDisputeId: params.disputeId,
+        },
+        ROUTE.accueil,
+      );
+    },
+
+    async notifyParentsOfChoreCompletion(params: {
+      familyId: string;
+      childFirstName: string;
+      choreTitle: string;
+      choreCompletionId: string;
+    }) {
+      const members = await userRepo.listFamilyMembers(params.familyId);
+      const parents = members.filter((m) => m.role === 'PARENT');
+      if (parents.length === 0) return;
+
+      await createManyAndPush(
+        parents.map((p) => ({
+          userId: p.id,
+          type: 'CHORE_COMPLETED',
+          title: `${params.childFirstName} a fait une corvée`,
+          body: `${params.childFirstName} dit avoir fini « ${params.choreTitle} ».`,
+          relatedChoreCompletionId: params.choreCompletionId,
+        })),
+        ROUTE.maison,
+      );
+    },
+
+    async notifyChoreApproved(params: {
+      childUserId: string;
+      choreTitle: string;
+      rewardType: 'MONEY' | 'POINTS';
+      rewardCents: number | null;
+      rewardPoints: number | null;
+      approvedByFirstName: string;
+      choreCompletionId: string;
+    }) {
+      const reward =
+        params.rewardType === 'MONEY' ? formatChf(params.rewardCents ?? 0) : `${params.rewardPoints ?? 0} points`;
+      await createAndPush(
+        {
+          userId: params.childUserId,
+          type: 'CHORE_APPROVED',
+          title: 'Corvée validée !',
+          body: `${params.approvedByFirstName} a validé « ${params.choreTitle} » — tu as gagné ${reward}.`,
+          relatedChoreCompletionId: params.choreCompletionId,
+        },
+        ROUTE.accueil,
+      );
+    },
+
+    async notifyChoreRejected(params: {
+      childUserId: string;
+      choreTitle: string;
+      rejectedByFirstName: string;
+      choreCompletionId: string;
+    }) {
+      await createAndPush(
+        {
+          userId: params.childUserId,
+          type: 'CHORE_REJECTED',
+          title: 'Corvée refusée',
+          body: `${params.rejectedByFirstName} n'a pas validé « ${params.choreTitle} ». Tu peux réessayer.`,
+          relatedChoreCompletionId: params.choreCompletionId,
+        },
+        ROUTE.accueil,
+      );
+    },
+
+    async notifyChoreReminder(params: { childUserId: string; choreTitle: string; choreId: string }) {
+      await createAndPush(
+        {
+          userId: params.childUserId,
+          type: 'CHORE_REMINDER',
+          title: 'Corvée à faire',
+          body: `N'oublie pas : « ${params.choreTitle} » n'est pas encore fait.`,
+          relatedChoreId: params.choreId,
+        },
+        ROUTE.maison,
+      );
+    },
+
+    async notifyParentsOfChoreAwaitingApproval(params: {
+      familyId: string;
+      childFirstName: string;
+      choreTitle: string;
+      choreCompletionId: string;
+    }) {
+      const members = await userRepo.listFamilyMembers(params.familyId);
+      const parents = members.filter((m) => m.role === 'PARENT');
+      if (parents.length === 0) return;
+
+      await createManyAndPush(
+        parents.map((p) => ({
+          userId: p.id,
+          type: 'CHORE_REMINDER',
+          title: 'Corvée en attente de validation',
+          body: `« ${params.choreTitle} » de ${params.childFirstName} attend toujours ta validation.`,
+          relatedChoreCompletionId: params.choreCompletionId,
+        })),
+        ROUTE.maison,
+      );
+    },
+
+    async notifyMealPlanTurn(params: { userId: string }) {
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'MEAL_PLAN_TURN',
+          title: "C'est ton tour de cuisiner !",
+          body: "N'oublie pas : c'est toi qui prépares le repas du soir aujourd'hui.",
+        },
+        ROUTE.maison,
+      );
+    },
+
+    /** Advance notice, sent the evening before — same MEAL_PLAN_TURN type as the same-day
+     * reminder, since both point at the same "who's cooking" screen. */
+    async notifyMealPlanTurnTomorrow(params: { userId: string }) {
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'MEAL_PLAN_TURN',
+          title: 'Demain, c\'est toi qui cuisines !',
+          body: "Pense à prévoir le repas du soir de demain, c'est ton tour.",
+        },
+        ROUTE.maison,
+      );
     },
 
     async notifyStockGiftReceived(params: {
@@ -305,13 +481,16 @@ export function createNotificationService(prisma: PrismaClient) {
       givenByFirstName: string;
       transactionId: string;
     }) {
-      await createAndPush({
-        userId: params.userId,
-        type: 'STOCK_GIFT_RECEIVED',
-        title: 'Tu as reçu des actions en cadeau',
-        body: `${params.givenByFirstName} t'a offert ${params.quantity} ${params.symbol}.`,
-        relatedTransactionId: params.transactionId,
-      });
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'STOCK_GIFT_RECEIVED',
+          title: 'Tu as reçu des actions en cadeau',
+          body: `${params.givenByFirstName} t'a offert ${params.quantity} ${params.symbol}.`,
+          relatedTransactionId: params.transactionId,
+        },
+        ROUTE.actions,
+      );
     },
   };
 }

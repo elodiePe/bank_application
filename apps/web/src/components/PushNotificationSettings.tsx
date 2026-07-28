@@ -4,8 +4,8 @@ export function PushNotificationSettings() {
   const push = usePushSubscription();
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h3 className="font-medium">Notifications push</h3>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <h3 className="font-medium">Notifications</h3>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
         Reçois une notification sur cet appareil pour les demandes, dépôts et autres opérations —
         même quand l'application est fermée.

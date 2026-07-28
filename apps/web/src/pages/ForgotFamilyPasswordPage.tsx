@@ -46,7 +46,7 @@ export function ForgotFamilyPasswordPage() {
           type="email"
           autoFocus
           {...register('ownerEmail')}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
         />
         {errors.ownerEmail && (
           <p className="text-sm text-red-600 dark:text-red-400">{errors.ownerEmail.message}</p>
@@ -55,7 +55,7 @@ export function ForgotFamilyPasswordPage() {
         <button
           type="submit"
           disabled={requestReset.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {requestReset.isPending ? 'Envoi…' : 'Envoyer le lien de réinitialisation'}
         </button>

@@ -93,7 +93,7 @@ export function StockPortfolioView() {
           <button
             type="button"
             onClick={() => setBuyOpen(true)}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+            className="rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
           >
             Ajouter une action
           </button>
@@ -110,7 +110,7 @@ export function StockPortfolioView() {
                 onClick={() => setDetailTarget({ symbol: h.symbol, companyName: h.companyName })}
                 role="button"
                 tabIndex={0}
-                className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-brand-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-700"
+                className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-brand-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-brand-700"
               >
                 <span
                   className="h-3 w-3 shrink-0 rounded-full"
@@ -173,7 +173,7 @@ export function StockPortfolioView() {
             {pendingOrders.map((o) => (
               <li
                 key={o.id}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
               >
                 {o.type === 'BUY' ? 'Achat' : 'Vente'} de {o.quantity} {o.symbol}
                 <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">en attente d'un parent</span>

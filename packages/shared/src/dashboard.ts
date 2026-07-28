@@ -4,6 +4,8 @@ export interface ChildBalanceSummary {
   firstName: string;
   balanceCents: number;
   weeklyAllowanceCents: number;
+  /** Cumulative score from chores rewarded in points instead of money. */
+  pointsBalance: number;
 }
 
 export interface ParentDashboardOverview {
@@ -22,5 +24,6 @@ export interface Sibling {
 export interface ChildDashboardOverview {
   balanceCents: number;
   weeklyAllowanceCents: number;
+  pointsBalance: number;
   siblings: Sibling[];
 }

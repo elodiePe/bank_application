@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { pinSchema, type ParentPermissions } from './auth.js';
+import { pinSchema, type ChildInterfaceLevel, type ParentPermissions } from './auth.js';
 
 export interface FamilyMemberDetail {
   id: string;
@@ -10,6 +10,8 @@ export interface FamilyMemberDetail {
   isActive: boolean;
   /** Non-null for PARENT, null for CHILD. */
   permissions: ParentPermissions | null;
+  /** Non-null for CHILD, null for PARENT. */
+  interfaceLevel: ChildInterfaceLevel | null;
 }
 
 export const updatePermissionsSchema = z.object({
@@ -62,5 +64,12 @@ export const addMemberSchema = z.object({
   canManageActions: z.boolean().optional(),
   canManageSettings: z.boolean().optional(),
   canManageFamily: z.boolean().optional(),
+  /// Only meaningful when role is CHILD — defaults to MIDDLE when omitted.
+  interfaceLevel: z.enum(['YOUNG', 'MIDDLE', 'TEEN']).optional(),
 });
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
+
+export const setChildInterfaceLevelSchema = z.object({
+  interfaceLevel: z.enum(['YOUNG', 'MIDDLE', 'TEEN']),
+});
+export type SetChildInterfaceLevelInput = z.infer<typeof setChildInterfaceLevelSchema>;

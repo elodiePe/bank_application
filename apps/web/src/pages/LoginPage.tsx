@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,7 +9,6 @@ import { bootstrapParentSchema, type BootstrapParentInput } from '@banque-famili
 import { fetchFamilyMembers, loginWithPin } from '../services/auth.service.js';
 import { bootstrapParent } from '../services/member.service.js';
 import { ApiError } from '../services/api.js';
-import { useInvalidateCurrentUser } from '../hooks/useAuth.js';
 import { useLogoutFamily } from '../hooks/useFamilyAuth.js';
 import { useRequestMemberPinReset, useRequestPinResetNotification } from '../hooks/useMembers.js';
 import { PinPad } from '../components/PinPad.js';
@@ -36,16 +35,20 @@ function initials(firstName: string): string {
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const invalidateCurrentUser = useInvalidateCurrentUser();
+  const queryClient = useQueryClient();
   const logoutFamily = useLogoutFamily();
   const [selected, setSelected] = useState<FamilyMemberSummary | null>(null);
   const [pin, setPin] = useState('');
 
   const membersQuery = useQuery({ queryKey: ['auth', 'members'], queryFn: fetchFamilyMembers });
 
-  async function onLoginSuccess() {
-    await invalidateCurrentUser();
-    navigate('/dashboard', { replace: true });
+  // Full clear, not just an invalidate: every member-scoped query (chores, money
+  // requests, dashboard overview...) is cached under a fixed key with no user id in it, so
+  // switching members on the same device would otherwise briefly serve the previous
+  // member's data to whoever just logged in.
+  function onLoginSuccess() {
+    queryClient.clear();
+    navigate('/home', { replace: true });
   }
 
   const pinMutation = useMutation({
@@ -62,8 +65,8 @@ export function LoginPage() {
       const created = await bootstrapParent(values);
       await loginWithPin({ userId: created.id, pin: values.pin });
     },
-    onSuccess: async () => {
-      await invalidateCurrentUser();
+    onSuccess: () => {
+      queryClient.clear();
       navigate('/onboarding', { replace: true });
     },
   });
@@ -141,7 +144,7 @@ export function LoginPage() {
                   type="text"
                   autoFocus
                   {...registerBootstrap('firstName')}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
                 />
                 {bootstrapErrors.firstName && (
                   <p className="text-sm text-red-600 dark:text-red-400">{bootstrapErrors.firstName.message}</p>
@@ -155,7 +158,7 @@ export function LoginPage() {
                   inputMode="numeric"
                   maxLength={4}
                   {...registerBootstrap('pin')}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
                 />
                 {bootstrapErrors.pin && (
                   <p className="text-sm text-red-600 dark:text-red-400">{bootstrapErrors.pin.message}</p>
@@ -166,7 +169,7 @@ export function LoginPage() {
                 <button
                   type="submit"
                   disabled={bootstrapMutation.isPending}
-                  className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+                  className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
                 >
                   {bootstrapMutation.isPending ? 'Création…' : 'Créer mon compte'}
                 </button>

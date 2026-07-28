@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSettings, useUpdateInterestRate } from '../hooks/useTransactionActions.js';
+import { IconButton } from './IconButton.js';
+import { PencilIcon } from './icons.js';
 
 const formSchema = z.object({
   ratePercent: z.coerce.number().min(0, 'Ne peut pas être négatif').max(100, 'Maximum 100%'),
@@ -28,7 +30,7 @@ export function InterestRateSettings() {
   const currentPercent = (settings.data.defaultInterestRateBps / 100).toFixed(2);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <h3 className="font-medium">Taux d'intérêt annuel</h3>
       {!editing ? (
         <div className="mt-2 flex items-center justify-between">
@@ -38,13 +40,9 @@ export function InterestRateSettings() {
               versé en 12 fois, à la fin de chaque mois
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="text-sm text-brand-600 hover:underline dark:text-brand-400"
-          >
-            Modifier
-          </button>
+          <IconButton label="Modifier" variant="brand" onClick={() => setEditing(true)}>
+            <PencilIcon />
+          </IconButton>
         </div>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="mt-2 flex items-center gap-2">
@@ -60,7 +58,7 @@ export function InterestRateSettings() {
           <button
             type="submit"
             disabled={updateRate.isPending}
-            className="rounded-lg bg-brand-600 px-3 py-1 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+            className="rounded-full bg-brand-600 px-3 py-1 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
           >
             Enregistrer
           </button>

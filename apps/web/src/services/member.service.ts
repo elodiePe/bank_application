@@ -6,6 +6,7 @@ import type {
   DeactivateMemberInput,
   FamilyMemberDetail,
   ResetPinInput,
+  SetChildInterfaceLevelInput,
   SetEmailInput,
   UpdatePermissionsInput,
 } from '@banque-familiale/shared';
@@ -49,6 +50,13 @@ export function confirmMemberPinReset(input: ConfirmMemberPinResetInput): Promis
 
 export function requestPinResetNotification(memberId: string): Promise<void> {
   return apiPost<void>(`/members/${memberId}/request-pin-reset-notification`);
+}
+
+export function setChildInterfaceLevel(
+  memberId: string,
+  input: SetChildInterfaceLevelInput,
+): Promise<FamilyMemberDetail> {
+  return apiPatch<FamilyMemberDetail>(`/members/${memberId}/interface-level`, input);
 }
 
 export function updateMemberPermissions(

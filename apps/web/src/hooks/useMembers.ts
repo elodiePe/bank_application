@@ -5,6 +5,7 @@ import type {
   ConfirmMemberPinResetInput,
   DeactivateMemberInput,
   ResetPinInput,
+  SetChildInterfaceLevelInput,
   SetEmailInput,
   UpdatePermissionsInput,
 } from '@banque-familiale/shared';
@@ -17,6 +18,7 @@ import {
   requestMemberPinReset,
   requestPinResetNotification,
   resetMemberPin,
+  setChildInterfaceLevel,
   setOwnEmail,
   updateMemberPermissions,
 } from '../services/member.service.js';
@@ -76,6 +78,15 @@ export function useConfirmMemberPinReset() {
 
 export function useRequestPinResetNotification() {
   return useMutation({ mutationFn: (memberId: string) => requestPinResetNotification(memberId) });
+}
+
+export function useSetChildInterfaceLevel() {
+  const invalidateMembers = useInvalidateMembers();
+  return useMutation({
+    mutationFn: ({ memberId, input }: { memberId: string; input: SetChildInterfaceLevelInput }) =>
+      setChildInterfaceLevel(memberId, input),
+    onSuccess: invalidateMembers,
+  });
 }
 
 export function useUpdateMemberPermissions() {

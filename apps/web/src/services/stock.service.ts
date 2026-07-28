@@ -41,6 +41,12 @@ export function giftStock(input: GiftStockInput): Promise<StockOrderSummary> {
   return apiPost<StockOrderSummary>('/stocks/gift', input);
 }
 
+/** A parent buying/selling directly on a child's behalf — executes immediately, no approval
+ * step, unlike a CHILD's own createStockOrder. */
+export function buyOrSellForChild(accountId: string, input: CreateStockOrderInput): Promise<StockOrderSummary> {
+  return apiPost<StockOrderSummary>(`/stocks/orders/for/${accountId}`, input);
+}
+
 export function fetchMyStockOrders(): Promise<StockOrderSummary[]> {
   return apiGet<StockOrderSummary[]>('/stocks/orders/mine');
 }

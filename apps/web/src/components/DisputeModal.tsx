@@ -71,7 +71,7 @@ export function DisputeModal({
         <button
           type="submit"
           disabled={createDispute.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {createDispute.isPending ? 'Envoi…' : 'Signaler'}
         </button>

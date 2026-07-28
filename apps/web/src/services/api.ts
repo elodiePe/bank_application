@@ -19,7 +19,7 @@ async function parseErrorCode(res: Response): Promise<string> {
 }
 
 async function apiRequest<T>(
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
 ): Promise<T> {
@@ -50,4 +50,8 @@ export function apiPut<T>(path: string, body?: unknown): Promise<T> {
 
 export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   return apiRequest<T>('PATCH', path, body);
+}
+
+export function apiDelete<T>(path: string): Promise<T> {
+  return apiRequest<T>('DELETE', path);
 }

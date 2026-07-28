@@ -17,6 +17,10 @@ import { createMemberRouter } from './routes/member.routes.js';
 import { createFamilyAuthRouter } from './routes/familyAuth.routes.js';
 import { createStockRouter } from './routes/stock.routes.js';
 import { createFxRouter } from './routes/fx.routes.js';
+import { createChoreRouter } from './routes/chore.routes.js';
+import { createMealPlanRouter } from './routes/mealPlan.routes.js';
+import { createShoppingListRouter } from './routes/shoppingList.routes.js';
+import { createPointsRewardRouter } from './routes/pointsReward.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -47,6 +51,10 @@ export function createApp() {
   app.use('/members', createMemberRouter(prisma));
   app.use('/stocks', createStockRouter(prisma));
   app.use('/fx', createFxRouter());
+  app.use('/chores', createChoreRouter(prisma));
+  app.use('/meal-plan', createMealPlanRouter(prisma));
+  app.use('/shopping-list', createShoppingListRouter(prisma));
+  app.use('/points-rewards', createPointsRewardRouter(prisma));
 
   app.use(errorHandler);
 

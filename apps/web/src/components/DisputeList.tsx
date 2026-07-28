@@ -3,6 +3,8 @@ import type { DisputeSummary } from '@banque-familiale/shared';
 import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { TRANSACTION_TYPE_LABELS } from '../utils/transactionLabels.js';
 import { useDismissDispute } from '../hooks/useDisputes.js';
+import { statusBackgroundClass } from '../utils/statusColors.js';
+import { TypeBadge } from './TypeBadge.js';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -34,9 +36,10 @@ export function DisputeList({ disputes, emptyLabel, onCorrect, canAct = true }: 
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.03 }}
-          className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          className={`flex items-center justify-between rounded-xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${statusBackgroundClass(d.status)}`}
         >
           <div>
+            <TypeBadge>Signalement</TypeBadge>
             <p className="font-medium">
               {d.raisedByFirstName} · {TRANSACTION_TYPE_LABELS[d.transactionType]} ·{' '}
               {formatMoney(d.transactionAmountCents, STORAGE_CURRENCY)}

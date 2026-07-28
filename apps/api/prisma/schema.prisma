@@ -16,6 +16,15 @@ enum Role {
   CHILD
 }
 
+/// Which child dashboard variant to render — chosen directly by a parent (not derived
+/// from a birth date), since a parent knows their own child's maturity better than an
+/// age calculation would. Ignored for PARENT users.
+enum ChildInterfaceLevel {
+  YOUNG
+  MIDDLE
+  TEEN
+}
+
 enum TransactionType {
   DEPOSIT
   WITHDRAWAL
@@ -28,6 +37,26 @@ enum TransactionType {
   STOCK_BUY
   STOCK_SELL
   STOCK_GIFT
+  CHORE_REWARD
+}
+
+enum ChoreRecurrence {
+  ONCE
+  DAILY
+  WEEKLY
+}
+
+enum ChoreCompletionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Whether a chore's reward moves real money (a Transaction, like today) or just adds to
+/// a purely cosmetic points score kept on ChildAccount — chosen per chore by the parent.
+enum ChoreRewardType {
+  MONEY
+  POINTS
 }
 
 enum StockOrderType {
@@ -84,7 +113,17 @@ enum NotificationType {
   CREDENTIAL_RESET_REQUESTED
   DISPUTE_RAISED
   DISPUTE_DISMISSED
+  CHORE_COMPLETED
+  CHORE_APPROVED
+  CHORE_REJECTED
+  CHORE_REMINDER
+  MEAL_PLAN_TURN
   GENERIC
+}
+
+enum MealPlanDayMode {
+  FIXED
+  ROTATING
 }
 
 /// A family is its own isolated tenant: its own owner login, members, accounts and
@@ -112,18 +151,21 @@ model Family {
 }
 
 model User {
-  id           String  @id @default(cuid())
-  familyId     String
-  family       Family  @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  role         Role
-  firstName    String
+  id             String              @id @default(cuid())
+  familyId       String
+  family         Family              @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  role           Role
+  firstName      String
   /// Parents only — used as a confirmation step when deactivating a family member, and
   /// for future account recovery. Not required for children.
-  email        String? @unique
+  email          String?             @unique
   /// Parents only — bcrypt hash.
-  passwordHash String?
+  passwordHash   String?
   /// Required for children, optional for parents — bcrypt hash of a 4-digit PIN.
-  pinHash      String?
+  pinHash        String?
+  /// Children only — which dashboard variant to show them, set by a parent. Defaults to
+  /// MIDDLE (today's unchanged dashboard) so existing accounts render exactly as before.
+  interfaceLevel ChildInterfaceLevel @default(MIDDLE)
 
   /// Brute-force protection — a 4-digit PIN only has 10 000 combinations.
   failedLoginAttempts Int       @default(0)
@@ -148,20 +190,26 @@ model User {
 
   childAccount ChildAccount?
 
-  notificationsReceived  Notification[]     @relation("NotificationRecipient")
-  moneyRequestsMade      MoneyRequest[]     @relation("MoneyRequestRequester")
-  moneyRequestsTargeted  MoneyRequest[]     @relation("MoneyRequestTarget")
-  moneyRequestsResponded MoneyRequest[]     @relation("MoneyRequestResponder")
-  disputesRaised         Dispute[]          @relation("DisputeRaisedBy")
-  disputesResolved       Dispute[]          @relation("DisputeResolvedBy")
-  transactionsSent       Transaction[]      @relation("TransactionSender")
-  transactionsReceived   Transaction[]      @relation("TransactionReceiver")
-  transactionsValidated  Transaction[]      @relation("TransactionValidator")
-  auditLogs              AuditLog[]         @relation("AuditLogActor")
-  refreshSessions        RefreshSession[]
-  pushSubscriptions      PushSubscription[] @relation("PushSubscriptionOwner")
-  stockOrdersMade        StockOrder[]       @relation("StockOrderRequester")
-  stockOrdersResponded   StockOrder[]       @relation("StockOrderResponder")
+  notificationsReceived     Notification[]     @relation("NotificationRecipient")
+  moneyRequestsMade         MoneyRequest[]     @relation("MoneyRequestRequester")
+  moneyRequestsTargeted     MoneyRequest[]     @relation("MoneyRequestTarget")
+  moneyRequestsResponded    MoneyRequest[]     @relation("MoneyRequestResponder")
+  disputesRaised            Dispute[]          @relation("DisputeRaisedBy")
+  disputesResolved          Dispute[]          @relation("DisputeResolvedBy")
+  transactionsSent          Transaction[]      @relation("TransactionSender")
+  transactionsReceived      Transaction[]      @relation("TransactionReceiver")
+  transactionsValidated     Transaction[]      @relation("TransactionValidator")
+  auditLogs                 AuditLog[]         @relation("AuditLogActor")
+  refreshSessions           RefreshSession[]
+  pushSubscriptions         PushSubscription[] @relation("PushSubscriptionOwner")
+  stockOrdersMade           StockOrder[]       @relation("StockOrderRequester")
+  stockOrdersResponded      StockOrder[]       @relation("StockOrderResponder")
+  choresAssigned            Chore[]            @relation("ChoreChild")
+  choreCompletionsResponded ChoreCompletion[]  @relation("ChoreCompletionResponder")
+  mealPlanFixedDays         MealPlanSlot[]             @relation("MealPlanFixedAssignee")
+  mealCookNotifications     MealCookNotificationLog[]  @relation("MealCookNotified")
+  shoppingListItemsAdded    ShoppingListItem[]         @relation("ShoppingListAddedBy")
+  shoppingListItemsChecked  ShoppingListItem[]         @relation("ShoppingListCheckedBy")
 
   @@index([familyId])
   /// Covers the login-picker query (active members of a family), run on every family
@@ -174,6 +222,10 @@ model ChildAccount {
   userId       String @unique
   user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   balanceCents Int    @default(0)
+
+  /// Cumulative score from chores rewarded in points instead of money. Purely cosmetic for
+  /// now — no conversion to real money, no redemption.
+  pointsBalance Int @default(0)
 
   /// Weekly pocket money, in cents. 0 = disabled for this child.
   weeklyAllowanceCents  Int       @default(0)
@@ -279,6 +331,172 @@ model MoneyRequest {
   @@index([status])
 }
 
+/// A recurring or one-off task assigned by a parent to one specific child, with a cash
+/// reward. familyId is a loose (non-relation) scope field, same convention as
+/// Dispute.transactionId below — the child it's assigned to already anchors it to a family.
+model Chore {
+  id String @id @default(cuid())
+
+  familyId String
+
+  childUserId String
+  childUser   User   @relation("ChoreChild", fields: [childUserId], references: [id], onDelete: Cascade)
+
+  title        String
+  rewardType   ChoreRewardType @default(MONEY)
+  /// Set when rewardType is MONEY, null when POINTS.
+  rewardCents  Int?
+  /// Set when rewardType is POINTS, null when MONEY.
+  rewardPoints Int?
+  recurrence   ChoreRecurrence
+
+  /// Soft toggle, never hard-deleted — consistent with deactivatedAt elsewhere. Also set to
+  /// false automatically once a ONCE chore's completion is approved (nothing left to do).
+  active Boolean @default(true)
+
+  /// Set when a CHORE_REMINDER notification was last sent to the child for this chore's
+  /// current period, so the hourly reminder check never nags twice for the same period.
+  lastReminderSentAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  completions ChoreCompletion[]
+
+  @@index([familyId])
+  @@index([childUserId])
+}
+
+/// One row per time a child marks a chore done. Unlike AllowanceHistory/InterestHistory
+/// (system-generated, strictly one row per period), there is no DB-level unique constraint
+/// on [choreId, periodStart]: a REJECTED completion must allow the child to try again in the
+/// same period, so "already pending/done for this period" is checked in application code.
+model ChoreCompletion {
+  id String @id @default(cuid())
+
+  choreId String
+  chore   Chore  @relation(fields: [choreId], references: [id], onDelete: Cascade)
+
+  /// The day (DAILY), the Monday of the week (WEEKLY), or the chore's creation day (ONCE)
+  /// this completion counts toward.
+  periodStart DateTime
+  status      ChoreCompletionStatus @default(PENDING)
+
+  /// Copied from Chore.rewardType/rewardCents/rewardPoints at completion time, so a later
+  /// reward edit never rewrites already-recorded history.
+  rewardType   ChoreRewardType
+  rewardCents  Int?
+  rewardPoints Int?
+
+  respondedById String?
+  respondedBy   User?     @relation("ChoreCompletionResponder", fields: [respondedById], references: [id], onDelete: Cascade)
+  respondedAt   DateTime?
+
+  /// Set only once approved, linking to the transaction it produced.
+  transactionId String? @unique
+
+  /// Set once a CHORE_REMINDER notification has been sent to the parents for this pending
+  /// completion, so the hourly reminder check only nags once per completion.
+  reminderSentAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([choreId])
+  @@index([status])
+}
+
+/// One reward tier a parent defines for a specific child's cosmetic chore-points score (e.g.
+/// "100 points = choisir le dessert"). Per-child, not family-wide — each child has their own
+/// ladder, since siblings rarely want the same rewards at the same point thresholds.
+model PointsRewardGoal {
+  id String @id @default(cuid())
+
+  familyId       String
+  childUserId    String
+  title          String
+  pointsRequired Int
+
+  createdAt DateTime @default(now())
+
+  @@index([familyId])
+  @@index([childUserId])
+}
+
+/// One config row per weekday (0 = Monday .. 6 = Sunday) saying who cooks dinner that day.
+/// FIXED always resolves to `fixedUserId`. ROTATING draws from the family's single shared
+/// rotation order (MealPlanRotationOrder below) — every rotating weekday uses the same list
+/// and sequence, just offset by its own weekday number so several rotating days in the same
+/// week don't all land on the same person. Advances automatically every week — no stored
+/// per-week state, no scheduled job needed to "move it along".
+model MealPlanSlot {
+  id String @id @default(cuid())
+
+  familyId String
+  weekday  Int
+
+  mode MealPlanDayMode @default(FIXED)
+
+  /// Set when mode is FIXED, null when ROTATING.
+  fixedUserId String?
+  fixedUser   User?   @relation("MealPlanFixedAssignee", fields: [fixedUserId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([familyId, weekday])
+  @@index([familyId])
+}
+
+/// The one shared rotation order used by every ROTATING weekday in a family — one row per
+/// family. Deliberately not per-weekday: "the rotation order is always the same" regardless
+/// of which day is rotating, so the parent only ever configures it once.
+model MealPlanRotationOrder {
+  familyId        String   @id
+  orderedUserIds  String[] @default([])
+  updatedAt       DateTime @updatedAt
+}
+
+/// Dedupe log for the "it's your turn to cook" pushes — one row per family, per calendar date,
+/// per kind (TODAY same-day reminder, ADVANCE the evening-before heads-up for the next day) once
+/// that (date, kind) pair has been notified, so the hourly check never nags twice. Split by kind
+/// because both reminders can legitimately target the same date: TODAY's advance notice sent
+/// yesterday evening, and TODAY's own same-day reminder sent once that date arrives.
+model MealCookNotificationLog {
+  id String @id @default(cuid())
+
+  familyId String
+  date     DateTime
+  kind     String   @default("TODAY")
+
+  userId String
+  user   User   @relation("MealCookNotified", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([familyId, date, kind])
+  @@index([familyId])
+}
+
+/// A shared family shopping list — any member can add or check off an item. familyId is a
+/// loose scope field, same convention as Chore.familyId above.
+model ShoppingListItem {
+  id String @id @default(cuid())
+
+  familyId String
+  label    String
+
+  isChecked Boolean @default(false)
+
+  addedById String
+  addedBy   User   @relation("ShoppingListAddedBy", fields: [addedById], references: [id], onDelete: Cascade)
+
+  checkedById String?
+  checkedBy   User?   @relation("ShoppingListCheckedBy", fields: [checkedById], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([familyId])
+}
+
 /// A child flagging one of their own completed transactions as erroneous. Loosely linked to
 /// the Transaction by id (same pattern as Notification's relatedTransactionId) rather than a
 /// hard relation, since a transaction can outlive/precede the dispute feature.
@@ -315,9 +533,12 @@ model Notification {
   body   String
   isRead Boolean @default(false)
 
-  relatedTransactionId  String?
-  relatedMoneyRequestId String?
-  relatedDisputeId      String?
+  relatedTransactionId     String?
+  relatedMoneyRequestId    String?
+  relatedDisputeId         String?
+  relatedChoreCompletionId String?
+  /// Set only for CHORE_REMINDER (fires before any completion exists, unlike the field above).
+  relatedChoreId           String?
 
   createdAt DateTime @default(now())
 
@@ -373,17 +594,17 @@ model AllowanceHistory {
 /// running aggregate rather than derived from StockOrder history each time, so reading a
 /// portfolio never needs to replay every past order.
 model StockHolding {
-  id             String       @id @default(cuid())
-  accountId      String
-  account        ChildAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  symbol         String
-  companyName    String
-  quantity       Float
+  id               String       @id @default(cuid())
+  accountId        String
+  account          ChildAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol           String
+  companyName      String
+  quantity         Float
   /// Average cost per share, in cents — recomputed on every BUY/GIFT; unchanged on SELL.
   averageCostCents Int
   /// Set once when the position is opened (first BUY or GIFT); unchanged by later top-ups.
   /// A position that's fully sold and later reopened gets a fresh date on the new row.
-  firstPurchaseAt DateTime @default(now())
+  firstPurchaseAt  DateTime     @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -405,9 +626,9 @@ model StockOrder {
   type   StockOrderType
   status StockOrderStatus @default(PENDING)
 
-  symbol      String
-  companyName String
-  quantity    Float
+  symbol              String
+  companyName         String
+  quantity            Float
   /// Price snapshot at request time, shown to the parent for context — the actual trade
   /// re-fetches a live quote at approval time rather than trusting this stale value.
   estimatedPriceCents Int

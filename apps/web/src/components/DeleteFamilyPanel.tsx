@@ -8,7 +8,7 @@ export function DeleteFamilyPanel() {
   const requestDeletion = useRequestAccountDeletion();
 
   return (
-    <div className="rounded-xl border border-red-200 bg-white p-4 shadow-sm dark:border-red-900 dark:bg-slate-900">
+    <div className="rounded-xl border border-red-200 bg-white p-4 shadow-sm dark:border-red-900 dark:bg-slate-800">
       <h3 className="font-medium text-red-700 dark:text-red-400">Zone de danger</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
         Supprime définitivement le compte famille et toutes ses données (membres, comptes, historique).

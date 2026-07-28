@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from './Modal.js';
-import { useCreateStockOrder, useStockQuote, useStockSearch } from '../hooks/useStocks.js';
+import { useBuyOrSellForChild, useCreateStockOrder, useStockQuote, useStockSearch } from '../hooks/useStocks.js';
 import { formatMoney } from '../utils/currency.js';
 import { ApiError } from '../services/api.js';
 
@@ -29,9 +29,18 @@ interface StockOrderModalProps {
   initialSymbol?: string;
   initialCompanyName?: string;
   onClose: () => void;
+  /** When set, a parent is acting directly on this child's account — executes immediately,
+   * no approval step, instead of a CHILD's own order that needs a parent to approve later. */
+  forChildAccountId?: string;
 }
 
-export function StockOrderModal({ mode, initialSymbol, initialCompanyName, onClose }: StockOrderModalProps) {
+export function StockOrderModal({
+  mode,
+  initialSymbol,
+  initialCompanyName,
+  onClose,
+  forChildAccountId,
+}: StockOrderModalProps) {
   const [searchInput, setSearchInput] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState<{ symbol: string; companyName: string } | null>(
@@ -46,6 +55,8 @@ export function StockOrderModal({ mode, initialSymbol, initialCompanyName, onClo
   const search = useStockSearch(selected ? '' : debouncedQuery);
   const quote = useStockQuote(selected?.symbol ?? null);
   const createOrder = useCreateStockOrder();
+  const buyOrSellForChild = useBuyOrSellForChild();
+  const submitting = forChildAccountId ? buyOrSellForChild : createOrder;
 
   const {
     register,
@@ -55,16 +66,18 @@ export function StockOrderModal({ mode, initialSymbol, initialCompanyName, onClo
 
   function onSubmit(values: FormValues) {
     if (!selected) return;
-    createOrder.mutate(
-      {
-        type: mode,
-        symbol: selected.symbol,
-        companyName: selected.companyName,
-        quantity: values.quantity,
-        comment: values.comment,
-      },
-      { onSuccess: onClose },
-    );
+    const input = {
+      type: mode,
+      symbol: selected.symbol,
+      companyName: selected.companyName,
+      quantity: values.quantity,
+      comment: values.comment,
+    };
+    if (forChildAccountId) {
+      buyOrSellForChild.mutate({ accountId: forChildAccountId, input }, { onSuccess: onClose });
+    } else {
+      createOrder.mutate(input, { onSuccess: onClose });
+    }
   }
 
   const title = mode === 'BUY' ? 'Acheter une action' : `Vendre ${initialSymbol}`;
@@ -88,7 +101,7 @@ export function StockOrderModal({ mode, initialSymbol, initialCompanyName, onClo
             />
             {search.isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Recherche…</p>}
             {search.data && search.data.length > 0 && (
-              <ul className="max-h-48 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+              <ul className="max-h-48 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-700">
                 {search.data.map((r) => (
                   <li key={r.symbol}>
                     <button
@@ -108,7 +121,7 @@ export function StockOrderModal({ mode, initialSymbol, initialCompanyName, onClo
 
         {selected && (
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
-            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
               <p className="font-medium">
                 {selected.symbol}{' '}
                 <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
@@ -163,24 +176,32 @@ export function StockOrderModal({ mode, initialSymbol, initialCompanyName, onClo
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
             />
 
-            {createOrder.isError && (
+            {submitting.isError && (
               <p className="text-sm text-red-600 dark:text-red-400">
-                {createOrder.error instanceof ApiError
-                  ? (ERROR_MESSAGES[createOrder.error.code] ?? 'Une erreur est survenue.')
+                {submitting.error instanceof ApiError
+                  ? (ERROR_MESSAGES[submitting.error.code] ?? 'Une erreur est survenue.')
                   : 'Une erreur est survenue.'}
               </p>
             )}
 
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Cet ordre devra être validé par un parent avant d'être exécuté.
-            </p>
+            {!forChildAccountId && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Cet ordre devra être validé par un parent avant d'être exécuté.
+              </p>
+            )}
 
             <button
               type="submit"
-              disabled={createOrder.isPending}
-              className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+              disabled={submitting.isPending}
+              className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
             >
-              {createOrder.isPending ? 'Envoi…' : mode === 'BUY' ? "Proposer l'achat" : 'Proposer la vente'}
+              {submitting.isPending
+                ? 'Envoi…'
+                : forChildAccountId
+                  ? (mode === 'BUY' ? 'Acheter' : 'Vendre')
+                  : mode === 'BUY'
+                    ? "Proposer l'achat"
+                    : 'Proposer la vente'}
             </button>
           </form>
         )}

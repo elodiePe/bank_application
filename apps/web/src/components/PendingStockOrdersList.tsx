@@ -19,7 +19,7 @@ export function PendingStockOrdersList({ canAct = true }: { canAct?: boolean }) 
         {pending.data.map((o) => (
           <li
             key={o.id}
-            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
           >
             <div>
               <p className="font-medium">

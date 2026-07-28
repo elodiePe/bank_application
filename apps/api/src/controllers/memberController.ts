@@ -6,6 +6,7 @@ import {
   confirmMemberPinResetSchema,
   deactivateMemberSchema,
   resetPinSchema,
+  setChildInterfaceLevelSchema,
   setEmailSchema,
   updatePermissionsSchema,
 } from '@banque-familiale/shared';
@@ -61,8 +62,22 @@ export function createMemberController(memberService: MemberService) {
         canManageActions: parsed.data.canManageActions,
         canManageSettings: parsed.data.canManageSettings,
         canManageFamily: parsed.data.canManageFamily,
+        interfaceLevel: parsed.data.interfaceLevel,
       });
       res.status(201).json(member);
+    },
+
+    async setChildInterfaceLevel(req: Request, res: Response) {
+      const parsed = setChildInterfaceLevelSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+      const member = await memberService.setChildInterfaceLevel({
+        familyId: req.auth!.familyId,
+        actorId: req.auth!.sub,
+        targetUserId: String(req.params.id),
+        interfaceLevel: parsed.data.interfaceLevel,
+      });
+      res.json(member);
     },
 
     async updatePermissions(req: Request, res: Response) {

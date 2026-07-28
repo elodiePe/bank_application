@@ -5,6 +5,8 @@ import { z } from 'zod';
 import type { ChildBalanceSummary } from '@banque-familiale/shared';
 import { useSetWeeklyAllowance } from '../hooks/useTransactionActions.js';
 import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
+import { IconButton } from './IconButton.js';
+import { PencilIcon } from './icons.js';
 
 const formSchema = z.object({
   amountChf: z.coerce.number().min(0, 'Ne peut pas être négatif'),
@@ -33,13 +35,9 @@ function AllowanceRow({ child }: { child: ChildBalanceSummary }) {
               ? `${formatMoney(child.weeklyAllowanceCents, STORAGE_CURRENCY)} / semaine`
               : 'Désactivé'}
           </span>
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="text-sm text-brand-600 hover:underline dark:text-brand-400"
-          >
-            Modifier
-          </button>
+          <IconButton label="Modifier" variant="brand" onClick={() => setEditing(true)}>
+            <PencilIcon />
+          </IconButton>
         </div>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="flex items-center gap-2">
@@ -55,7 +53,7 @@ function AllowanceRow({ child }: { child: ChildBalanceSummary }) {
           <button
             type="submit"
             disabled={setAllowance.isPending}
-            className="rounded-lg bg-brand-600 px-3 py-1 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+            className="rounded-full bg-brand-600 px-3 py-1 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
           >
             Enregistrer
           </button>
@@ -74,11 +72,11 @@ function AllowanceRow({ child }: { child: ChildBalanceSummary }) {
 
 export function WeeklyAllowanceSettings({ children }: { children: ChildBalanceSummary[] }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <h3 className="font-medium">Argent de poche hebdomadaire</h3>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
+      {/* <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
         Versé automatiquement chaque lundi. 0 = désactivé.
-      </p>
+      </p> */}
       <div className="mt-2 divide-y divide-slate-200 dark:divide-slate-800">
         {children.map((child) => (
           <AllowanceRow key={child.accountId} child={child} />

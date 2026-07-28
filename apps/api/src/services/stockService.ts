@@ -419,6 +419,109 @@ export function createStockService(prisma: PrismaClient) {
       };
     },
 
+    /** A parent buys or sells directly on a child's behalf — no pending order, no approval
+     * step, executed immediately, same as a deposit/withdrawal a parent makes directly. */
+    async buyOrSellForChild(params: {
+      actorId: string;
+      actorFamilyId: string;
+      accountId: string;
+      input: CreateStockOrderInput;
+    }): Promise<StockOrderSummary> {
+      const account = await accountRepo.findByIdOrThrow(params.accountId);
+      if (account.user.familyId !== params.actorFamilyId) {
+        throw new ForbiddenError("Ce compte n'appartient pas à votre famille");
+      }
+      if (account.user.role !== 'CHILD') {
+        throw new ValidationError('Seul un compte enfant peut avoir un portefeuille.');
+      }
+
+      const quote = await priceService.getQuote(params.input.symbol, params.input.companyName);
+      const totalCents = Math.round(quote.currentPriceCents * params.input.quantity);
+
+      const transaction = await prisma.$transaction(async (tx) => {
+        const txAccountRepo = createChildAccountRepository(tx);
+        const txStockRepo = createStockRepository(tx);
+        const txTransactionRepo = createTransactionRepository(tx);
+
+        if (params.input.type === 'BUY') {
+          if (totalCents > account.balanceCents) throw new InsufficientFundsError();
+          const balanceAfter = account.balanceCents - totalCents;
+          const created = await txTransactionRepo.create({
+            account: { connect: { id: account.id } },
+            type: 'STOCK_BUY',
+            status: 'COMPLETED',
+            amountCents: totalCents,
+            balanceBeforeCents: account.balanceCents,
+            balanceAfterCents: balanceAfter,
+            comment: params.input.comment ?? `Achat de ${params.input.quantity} ${quote.symbol}`,
+            stockSymbol: quote.symbol,
+            stockQuantity: params.input.quantity,
+            validatedBy: { connect: { id: params.actorId } },
+            occurredAt: new Date(),
+          });
+          await txAccountRepo.updateBalance(account.id, balanceAfter);
+          await txStockRepo.upsertHoldingAfterBuy({
+            accountId: account.id,
+            symbol: quote.symbol,
+            companyName: quote.companyName,
+            addedQuantity: params.input.quantity,
+            addedCostCents: totalCents,
+          });
+          return created;
+        }
+
+        const holding = await txStockRepo.findHolding(account.id, quote.symbol);
+        if (!holding || holding.quantity < params.input.quantity) {
+          throw new ValidationError("L'enfant ne possède pas assez de cette action pour la vendre.");
+        }
+        const balanceAfter = account.balanceCents + totalCents;
+        const created = await txTransactionRepo.create({
+          account: { connect: { id: account.id } },
+          type: 'STOCK_SELL',
+          status: 'COMPLETED',
+          amountCents: totalCents,
+          balanceBeforeCents: account.balanceCents,
+          balanceAfterCents: balanceAfter,
+          comment: params.input.comment ?? `Vente de ${params.input.quantity} ${quote.symbol}`,
+          stockSymbol: quote.symbol,
+          stockQuantity: params.input.quantity,
+          validatedBy: { connect: { id: params.actorId } },
+          occurredAt: new Date(),
+        });
+        await txAccountRepo.updateBalance(account.id, balanceAfter);
+        await txStockRepo.reduceHoldingAfterSell(holding.id, params.input.quantity, holding.quantity - params.input.quantity);
+        return created;
+      });
+
+      const actor = await userRepo.findById(params.actorId);
+
+      await notificationService.notifyStockOrderApproved({
+        requesterId: account.userId,
+        type: params.input.type,
+        symbol: quote.symbol,
+        quantity: params.input.quantity,
+        approvedByFirstName: actor?.firstName ?? '',
+      });
+
+      return {
+        id: transaction.id,
+        requesterId: params.actorId,
+        requesterFirstName: actor?.firstName ?? '',
+        accountId: account.id,
+        childFirstName: account.user.firstName,
+        type: params.input.type,
+        status: 'APPROVED',
+        symbol: quote.symbol,
+        companyName: quote.companyName,
+        quantity: params.input.quantity,
+        estimatedPriceCents: quote.currentPriceCents,
+        comment: params.input.comment ?? null,
+        createdAt: transaction.occurredAt.toISOString(),
+        respondedByFirstName: actor?.firstName ?? null,
+        respondedAt: transaction.occurredAt.toISOString(),
+      };
+    },
+
     async cancel(params: { orderId: string; actorId: string }): Promise<StockOrderSummary> {
       const order = await stockRepo.findOrderByIdOrThrow(params.orderId);
       if (order.status !== 'PENDING') throw new InvalidRequestStateError();

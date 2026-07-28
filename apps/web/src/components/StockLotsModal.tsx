@@ -37,7 +37,7 @@ export function StockLotsModal({ symbol, companyName, onClose }: StockLotsModalP
             {lots.data.map((lot) => (
               <li
                 key={lot.id}
-                className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800"
+                className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">

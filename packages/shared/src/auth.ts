@@ -84,4 +84,19 @@ export interface AuthenticatedUser {
   email: string | null;
   /** Non-null for PARENT, null for CHILD. */
   permissions: ParentPermissions | null;
+  /** Non-null for CHILD, null for PARENT — which dashboard variant to render. */
+  interfaceLevel: ChildInterfaceLevel | null;
 }
+
+/// Which child dashboard variant to render — chosen directly by a parent (not derived
+/// from a birth date), since a parent knows their own child's maturity better than an
+/// age calculation would.
+export type ChildInterfaceLevel = 'YOUNG' | 'MIDDLE' | 'TEEN';
+
+export const CHILD_INTERFACE_LEVELS: ChildInterfaceLevel[] = ['YOUNG', 'MIDDLE', 'TEEN'];
+
+export const CHILD_INTERFACE_LEVEL_LABELS: Record<ChildInterfaceLevel, string> = {
+  YOUNG: '6-8 ans — très simplifié',
+  MIDDLE: '9-11 ans — standard',
+  TEEN: '12-14 ans — avancé',
+};

@@ -53,6 +53,7 @@ function toAuthenticatedUser(user: User): AuthenticatedUser {
             canManageFamily: user.canManageFamily,
           }
         : null,
+    interfaceLevel: user.role === 'CHILD' ? user.interfaceLevel : null,
   };
 }
 

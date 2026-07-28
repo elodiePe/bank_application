@@ -1,25 +1,44 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SUPPORTED_CURRENCIES, bootstrapParentSchema, type BootstrapParentInput } from '@banque-familiale/shared';
+import {
+  CHILD_INTERFACE_LEVELS,
+  CHILD_INTERFACE_LEVEL_LABELS,
+  CHORE_TEMPLATES,
+  SUPPORTED_CURRENCIES,
+  bootstrapParentSchema,
+  type BootstrapParentInput,
+} from '@banque-familiale/shared';
 import { useAddMember, useUpdateMemberPermissions } from '../hooks/useMembers.js';
 import { useParentOverview, useCompleteOnboarding } from '../hooks/useDashboard.js';
+import { useCreateChore } from '../hooks/useChores.js';
 import { useSetWeeklyAllowance, useSettings, useUpdateCurrency, useUpdateInterestRate } from '../hooks/useTransactionActions.js';
 import { usePushSubscription } from '../pwa/usePushSubscription.js';
 import { STORAGE_CURRENCY } from '../utils/currency.js';
 import { ApiError } from '../services/api.js';
 import { Select } from '../components/Select.js';
-import { FULL_PERMISSIONS, PermissionCheckboxes, type PermissionValues } from '../components/PermissionCheckboxes.js';
+import { PermissionCheckboxes } from '../components/PermissionCheckboxes.js';
+import { FULL_PERMISSIONS, type PermissionValues } from '../utils/permissions.js';
 
-type Phase = 'welcome' | 'currency' | 'child' | 'allowance' | 'moreChildren' | 'parents' | 'interest' | 'push' | 'done';
+type Phase =
+  | 'welcome'
+  | 'currency'
+  | 'child'
+  | 'allowance'
+  | 'chores'
+  | 'moreChildren'
+  | 'parents'
+  | 'interest'
+  | 'push'
+  | 'done';
 
 const SECTIONS: { label: string; phases: Phase[] }[] = [
   { label: 'Bienvenue', phases: ['welcome'] },
   { label: 'Devise', phases: ['currency'] },
-  { label: 'Enfants', phases: ['child', 'allowance', 'moreChildren'] },
+  { label: 'Enfants', phases: ['child', 'allowance', 'chores', 'moreChildren'] },
   { label: 'Parents', phases: ['parents'] },
   { label: 'Réglages', phases: ['interest', 'push'] },
   { label: 'Terminé', phases: ['done'] },
@@ -56,7 +75,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       <button
         type="button"
         onClick={onNext}
-        className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+        className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
       >
         C'est parti
       </button>
@@ -95,7 +114,7 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
         type="button"
         onClick={onSubmit}
         disabled={updateCurrency.isPending}
-        className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
       >
         {updateCurrency.isPending ? 'Enregistrement…' : 'Suivant'}
       </button>
@@ -106,6 +125,7 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
 const childFormSchema = z.object({
   firstName: z.string().trim().min(1, 'Le prénom est requis').max(50),
   pin: z.string().regex(/^\d{4}$/, 'Le code doit contenir 4 chiffres'),
+  interfaceLevel: z.enum(['YOUNG', 'MIDDLE', 'TEEN']),
 });
 type ChildFormValues = z.infer<typeof childFormSchema>;
 
@@ -113,13 +133,17 @@ function AddChildStep({ isFirst, onNext }: { isFirst: boolean; onNext: (childUse
   const addMember = useAddMember();
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
-  } = useForm<ChildFormValues>({ resolver: zodResolver(childFormSchema) });
+  } = useForm<ChildFormValues>({
+    resolver: zodResolver(childFormSchema),
+    defaultValues: { interfaceLevel: 'MIDDLE' },
+  });
 
   function onSubmit(values: ChildFormValues) {
     addMember.mutate(
-      { firstName: values.firstName, role: 'CHILD', pin: values.pin },
+      { firstName: values.firstName, role: 'CHILD', pin: values.pin, interfaceLevel: values.interfaceLevel },
       { onSuccess: (created) => onNext(created.id) },
     );
   }
@@ -156,6 +180,25 @@ function AddChildStep({ isFirst, onNext }: { isFirst: boolean; onNext: (childUse
         />
         {errors.pin && <p className="text-sm text-red-600 dark:text-red-400">{errors.pin.message}</p>}
 
+        <label className="text-sm font-medium" htmlFor="interfaceLevel">
+          Interface
+        </label>
+        <Controller
+          name="interfaceLevel"
+          control={control}
+          render={({ field }) => (
+            <Select
+              id="interfaceLevel"
+              value={field.value}
+              onChange={field.onChange}
+              options={CHILD_INTERFACE_LEVELS.map((level) => ({
+                value: level,
+                label: CHILD_INTERFACE_LEVEL_LABELS[level],
+              }))}
+            />
+          )}
+        />
+
         {addMember.isError && (
           <p className="text-sm text-red-600 dark:text-red-400">
             {addMember.error instanceof ApiError ? 'Vérifie les informations saisies.' : 'Une erreur est survenue.'}
@@ -165,7 +208,7 @@ function AddChildStep({ isFirst, onNext }: { isFirst: boolean; onNext: (childUse
         <button
           type="submit"
           disabled={addMember.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {addMember.isPending ? 'Ajout…' : 'Suivant'}
         </button>
@@ -222,11 +265,102 @@ function AllowanceStep({
         <button
           type="submit"
           disabled={setAllowance.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {setAllowance.isPending ? 'Enregistrement…' : 'Suivant'}
         </button>
       </form>
+    </StepShell>
+  );
+}
+
+function ChoresStep({
+  childUserId,
+  childFirstName,
+  onNext,
+}: {
+  childUserId: string | null;
+  childFirstName: string;
+  onNext: () => void;
+}) {
+  const createChore = useCreateChore();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function toggle(title: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  }
+
+  async function onSubmit() {
+    if (!childUserId || selected.size === 0) return onNext();
+    setIsSubmitting(true);
+    try {
+      for (const template of CHORE_TEMPLATES) {
+        if (!selected.has(template.title)) continue;
+        await createChore.mutateAsync({
+          childUserId,
+          title: template.title,
+          rewardType: 'MONEY',
+          rewardCents: template.suggestedRewardCents,
+          recurrence: 'DAILY',
+        });
+      }
+      onNext();
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <StepShell>
+      <h1 className="text-xl font-bold">Des corvées pour {childFirstName} ?</h1>
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Optionnel — coche ce qui s'applique, chaque corvée cochée est ajoutée en quotidien avec une
+        récompense suggérée. Modifiable à tout moment depuis les Paramètres.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {CHORE_TEMPLATES.map((template) => {
+          const isSelected = selected.has(template.title);
+          return (
+            <button
+              key={template.title}
+              type="button"
+              onClick={() => toggle(template.title)}
+              className={
+                isSelected
+                  ? 'rounded-full bg-brand-600 px-3 py-1.5 text-sm font-medium text-white'
+                  : 'rounded-full border border-slate-300 px-3 py-1.5 text-sm hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700 dark:hover:border-brand-700 dark:hover:bg-brand-900/30'
+              }
+            >
+              {template.title}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={isSubmitting}
+          className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          {isSubmitting ? 'Ajout…' : selected.size > 0 ? 'Ajouter et continuer' : 'Suivant'}
+        </button>
+        {selected.size > 0 && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="text-sm text-slate-500 hover:underline dark:text-slate-400"
+          >
+            Passer
+          </button>
+        )}
+      </div>
     </StepShell>
   );
 }
@@ -243,14 +377,14 @@ function MoreChildrenStep({ onAddAnother, onDone }: { onAddAnother: () => void; 
         <button
           type="button"
           onClick={onAddAnother}
-          className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+          className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
         >
           Oui, ajouter un enfant
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="rounded-full border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
         >
           Non, continuer
         </button>
@@ -315,7 +449,7 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
           type="button"
           onClick={onValidatePermissions}
           disabled={updatePermissions.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {updatePermissions.isPending ? 'Enregistrement…' : 'Valider ces droits'}
         </button>
@@ -342,14 +476,14 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
           <button
             type="button"
             onClick={() => setFormOpen(true)}
-            className="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="rounded-full border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
           >
             + Ajouter un parent
           </button>
           <button
             type="button"
             onClick={onNext}
-            className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+            className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
           >
             Continuer
           </button>
@@ -393,7 +527,7 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
             <button
               type="submit"
               disabled={addMember.isPending}
-              className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+              className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
             >
               {addMember.isPending ? 'Ajout…' : 'Ajouter ce parent'}
             </button>
@@ -451,7 +585,7 @@ function InterestStep({ onNext }: { onNext: () => void }) {
         <button
           type="submit"
           disabled={updateRate.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {updateRate.isPending ? 'Enregistrement…' : 'Suivant'}
         </button>
@@ -475,7 +609,7 @@ function PushStep({ onNext }: { onNext: () => void }) {
           <button
             type="button"
             onClick={() => (push.state === 'subscribed' ? undefined : push.subscribe())}
-            className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+            className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
           >
             {push.state === 'subscribed' ? '✅ Notifications activées' : '🔔 Activer sur cet appareil'}
           </button>
@@ -493,7 +627,7 @@ function PushStep({ onNext }: { onNext: () => void }) {
         <button
           type="button"
           onClick={onNext}
-          className="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="rounded-full border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
         >
           Suivant
         </button>
@@ -514,7 +648,7 @@ function DoneStep({ onFinish, isPending }: { onFinish: () => void; isPending: bo
         type="button"
         onClick={onFinish}
         disabled={isPending}
-        className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
       >
         {isPending ? 'Un instant…' : 'Aller au tableau de bord'}
       </button>
@@ -563,6 +697,13 @@ export function OnboardingWizard() {
           {phase === 'allowance' && (
             <AllowanceStep
               accountId={childAccountId}
+              childFirstName={childFirstName}
+              onNext={() => setPhase('chores')}
+            />
+          )}
+          {phase === 'chores' && (
+            <ChoresStep
+              childUserId={childUserId}
               childFirstName={childFirstName}
               onNext={() => setPhase('moreChildren')}
             />

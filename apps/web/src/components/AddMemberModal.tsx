@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { addMemberSchema, type AddMemberInput } from '@banque-familiale/shared';
+import {
+  addMemberSchema,
+  CHILD_INTERFACE_LEVELS,
+  CHILD_INTERFACE_LEVEL_LABELS,
+  type AddMemberInput,
+} from '@banque-familiale/shared';
 import { Modal } from './Modal.js';
 import { Select } from './Select.js';
-import { FULL_PERMISSIONS, PermissionCheckboxes, type PermissionValues } from './PermissionCheckboxes.js';
+import { PermissionCheckboxes } from './PermissionCheckboxes.js';
+import { FULL_PERMISSIONS, type PermissionValues } from '../utils/permissions.js';
 import { useAddMember } from '../hooks/useMembers.js';
 import { ApiError } from '../services/api.js';
 
@@ -26,7 +32,10 @@ export function AddMemberModal({ onClose }: AddMemberModalProps) {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm<AddMemberInput>({ resolver: zodResolver(addMemberSchema), defaultValues: { role: 'CHILD' } });
+  } = useForm<AddMemberInput>({
+    resolver: zodResolver(addMemberSchema),
+    defaultValues: { role: 'CHILD', interfaceLevel: 'MIDDLE' },
+  });
 
   function onSubmit(values: AddMemberInput) {
     addMember.mutate(
@@ -87,6 +96,29 @@ export function AddMemberModal({ onClose }: AddMemberModalProps) {
         />
         {errors.pin && <p className="text-sm text-red-600 dark:text-red-400">{errors.pin.message}</p>}
 
+        {role === 'CHILD' && (
+          <>
+            <label className="text-sm font-medium" htmlFor="interfaceLevel">
+              Interface
+            </label>
+            <Controller
+              name="interfaceLevel"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  id="interfaceLevel"
+                  value={field.value ?? 'MIDDLE'}
+                  onChange={field.onChange}
+                  options={CHILD_INTERFACE_LEVELS.map((level) => ({
+                    value: level,
+                    label: CHILD_INTERFACE_LEVEL_LABELS[level],
+                  }))}
+                />
+              )}
+            />
+          </>
+        )}
+
         {role === 'PARENT' && (
           <>
             <p className="text-sm font-medium">Droits de ce parent</p>
@@ -105,7 +137,7 @@ export function AddMemberModal({ onClose }: AddMemberModalProps) {
         <button
           type="submit"
           disabled={addMember.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {addMember.isPending ? 'Ajout…' : 'Ajouter'}
         </button>

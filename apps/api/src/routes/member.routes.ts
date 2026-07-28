@@ -79,6 +79,11 @@ export function createMemberRouter(prisma: PrismaClient) {
     '/:id/permissions',
     asyncHandler((req, res) => controller.updatePermissions(req, res)),
   );
+  parentRouter.patch(
+    '/:id/interface-level',
+    requirePermission('canManageFamily'),
+    asyncHandler((req, res) => controller.setChildInterfaceLevel(req, res)),
+  );
 
   router.use(parentRouter);
 

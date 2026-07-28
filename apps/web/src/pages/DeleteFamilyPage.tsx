@@ -73,7 +73,7 @@ export function DeleteFamilyPage() {
           type="password"
           autoFocus
           {...register('ownerPassword')}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
         />
         {errors.ownerPassword && (
           <p className="text-sm text-red-600 dark:text-red-400">{errors.ownerPassword.message}</p>

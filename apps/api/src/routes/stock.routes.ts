@@ -52,6 +52,12 @@ export function createStockRouter(prisma: PrismaClient) {
     requirePermission('canManageActions'),
     asyncHandler((req, res) => controller.gift(req, res)),
   );
+  router.post(
+    '/orders/for/:accountId',
+    requireRole('PARENT'),
+    requirePermission('canManageActions'),
+    asyncHandler((req, res) => controller.buyOrSellForChild(req, res)),
+  );
   router.get(
     '/orders/mine',
     requireRole('CHILD'),

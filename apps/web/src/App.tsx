@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { RootLayout } from './layouts/RootLayout.js';
 import { DashboardRouter } from './pages/DashboardRouter.js';
+import { HomePage } from './pages/HomePage.js';
+import { ChoresPage } from './pages/ChoresPage.js';
 import { OnboardingWizard } from './pages/OnboardingWizard.js';
 import { TimelinePage } from './pages/TimelinePage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
@@ -51,6 +53,8 @@ export function App() {
           }
         >
           <Route path="/dashboard" element={<DashboardRouter />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/chores" element={<ChoresPage />} />
           <Route path="/history" element={<TimelinePage />} />
           <Route path="/portfolio" element={<StockPortfolioPage />} />
           <Route path="/settings" element={<SettingsPage />} />

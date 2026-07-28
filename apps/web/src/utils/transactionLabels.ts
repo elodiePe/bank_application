@@ -12,6 +12,7 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   STOCK_BUY: "Achat d'actions",
   STOCK_SELL: "Vente d'actions",
   STOCK_GIFT: "Cadeau d'actions",
+  CHORE_REWARD: 'Récompense corvée',
 };
 
 export const TRANSACTION_TYPE_ICONS: Record<TransactionType, string> = {
@@ -26,6 +27,7 @@ export const TRANSACTION_TYPE_ICONS: Record<TransactionType, string> = {
   STOCK_BUY: '📊',
   STOCK_SELL: '📉',
   STOCK_GIFT: '🎁',
+  CHORE_REWARD: '🧹',
 };
 
 /** Light background per transaction type, used on history cards instead of an icon. */
@@ -41,6 +43,7 @@ export const TRANSACTION_TYPE_BG_CLASSES: Record<TransactionType, string> = {
   STOCK_BUY: 'bg-indigo-50 dark:bg-indigo-950/40',
   STOCK_SELL: 'bg-orange-50 dark:bg-orange-950/40',
   STOCK_GIFT: 'bg-pink-50 dark:bg-pink-950/40',
+  CHORE_REWARD: 'bg-lime-50 dark:bg-lime-950/40',
 };
 
 export const TRANSACTION_STATUS_LABELS: Record<TransactionStatus, string> = {

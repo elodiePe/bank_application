@@ -129,7 +129,7 @@ export function TransferModal({ children, onClose }: TransferModalProps) {
         <button
           type="submit"
           disabled={transfer.isPending || children.length < 2}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {transfer.isPending ? 'Envoi…' : 'Confirmer'}
         </button>

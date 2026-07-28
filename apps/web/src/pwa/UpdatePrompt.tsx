@@ -38,7 +38,7 @@ export function UpdatePrompt() {
               <button
                 type="button"
                 onClick={() => updateServiceWorker(true)}
-                className="rounded-lg bg-brand-600 px-3 py-1 font-medium hover:bg-brand-500"
+                className="rounded-full bg-brand-600 px-3 py-1 font-medium hover:bg-brand-500"
               >
                 Mettre à jour
               </button>

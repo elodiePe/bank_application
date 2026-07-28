@@ -59,7 +59,7 @@ export function Select({ id, value, onChange, options, placeholder, disabled, wr
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.12 }}
-              className="absolute left-0 top-full z-50 mt-2 max-h-60 w-full min-w-max overflow-y-auto rounded-2xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+              className="absolute left-0 top-full z-50 mt-2 max-h-60 w-full min-w-max overflow-y-auto rounded-2xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800"
             >
               {options.map((o) => (
                 <li key={o.value} role="option" aria-selected={o.value === value}>

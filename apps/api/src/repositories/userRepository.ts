@@ -35,6 +35,7 @@ export function createUserRepository(prisma: PrismaClient) {
           canManageActions: true,
           canManageSettings: true,
           canManageFamily: true,
+          interfaceLevel: true,
         },
         orderBy: { createdAt: 'asc' },
       });
@@ -69,6 +70,10 @@ export function createUserRepository(prisma: PrismaClient) {
 
     setPinHash(userId: string, pinHash: string) {
       return prisma.user.update({ where: { id: userId }, data: { pinHash } });
+    },
+
+    setInterfaceLevel(userId: string, interfaceLevel: 'YOUNG' | 'MIDDLE' | 'TEEN') {
+      return prisma.user.update({ where: { id: userId }, data: { interfaceLevel } });
     },
 
     deactivate(userId: string) {

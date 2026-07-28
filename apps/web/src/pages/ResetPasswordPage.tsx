@@ -73,7 +73,7 @@ function FamilyPasswordResetForm({ token }: { token: string }) {
           autoFocus
           autoComplete="new-password"
           {...register('newPassword')}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
         />
         {errors.newPassword && (
           <p className="text-sm text-red-600 dark:text-red-400">{errors.newPassword.message}</p>
@@ -90,7 +90,7 @@ function FamilyPasswordResetForm({ token }: { token: string }) {
         <button
           type="submit"
           disabled={confirmReset.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {confirmReset.isPending ? 'Enregistrement…' : 'Réinitialiser le mot de passe'}
         </button>
@@ -136,7 +136,7 @@ function MemberPinResetForm({ token }: { token: string }) {
           maxLength={4}
           autoFocus
           {...register('newPin')}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
         />
         {errors.newPin && <p className="text-sm text-red-600 dark:text-red-400">{errors.newPin.message}</p>}
 
@@ -151,7 +151,7 @@ function MemberPinResetForm({ token }: { token: string }) {
         <button
           type="submit"
           disabled={confirmReset.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {confirmReset.isPending ? 'Enregistrement…' : 'Réinitialiser le code PIN'}
         </button>

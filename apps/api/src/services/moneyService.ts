@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { PrismaClient, Transaction } from '@prisma/client';
+import type { PrismaClient, Transaction, TransactionType } from '@prisma/client';
 import { createChildAccountRepository } from '../repositories/childAccountRepository.js';
 import { createTransactionRepository } from '../repositories/transactionRepository.js';
 import { createAuditLogRepository } from '../repositories/auditLogRepository.js';
@@ -33,7 +33,12 @@ function assertAccountActive(account: { user: { deactivatedAt: Date | null } }) 
 
 export function createMoneyService(prisma: PrismaClient) {
   return {
-    deposit(params: { accountId: string; amountCents: number; comment?: string } & ActorContext) {
+    // `type` defaults to DEPOSIT but can be overridden (e.g. CHORE_REWARD) by callers that
+    // credit money for a reason other than a plain manual deposit — the balance/account
+    // handling is identical either way.
+    deposit(
+      params: { accountId: string; amountCents: number; comment?: string; type?: TransactionType } & ActorContext,
+    ) {
       return prisma.$transaction(async (tx) => {
         const accountRepo = createChildAccountRepository(tx);
         const transactionRepo = createTransactionRepository(tx);
@@ -44,7 +49,7 @@ export function createMoneyService(prisma: PrismaClient) {
 
         const transaction = await transactionRepo.create({
           account: { connect: { id: params.accountId } },
-          type: 'DEPOSIT',
+          type: params.type ?? 'DEPOSIT',
           status: 'COMPLETED',
           amountCents: params.amountCents,
           balanceBeforeCents: account.balanceCents,

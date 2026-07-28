@@ -17,17 +17,20 @@ export function ChildBalanceCard({ child, index, onDeposit, onWithdraw }: ChildB
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm dark:border-slate-700/70 dark:bg-slate-800"
     >
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 font-semibold text-white">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-500 text-lg font-semibold text-white">
           {child.firstName.slice(0, 1).toUpperCase()}
         </span>
         <div>
           <span className="block font-medium">{child.firstName}</span>
-          <span className="block text-sm text-slate-500 dark:text-slate-400">
+          <span className="block text-lg font-semibold text-slate-700 dark:text-slate-300">
             {formatMoney(convertCents(child.balanceCents, rate), currency)}
           </span>
+          {/* {child.pointsBalance > 0 && (
+            <span className="block text-xs text-amber-600 dark:text-amber-400">⭐ {child.pointsBalance} points</span>
+          )} */}
         </div>
       </div>
       {(onDeposit || onWithdraw) && (

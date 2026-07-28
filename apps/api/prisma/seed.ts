@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { ChildInterfaceLevel, PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const SALT_ROUNDS = 12;
@@ -16,10 +16,11 @@ const DEMO_PARENTS = [
   { firstName: 'Maman', pin: '2222', email: 'maman@banque-familiale.local' },
 ];
 
+// One of each interface level, so the three dashboard variants can be checked visually.
 const DEMO_CHILDREN = [
-  { firstName: 'Elodie', pin: '3333' },
-  { firstName: 'Matthieu', pin: '4444' },
-  { firstName: 'Damien', pin: '5555' },
+  { firstName: 'Elodie', pin: '3333', interfaceLevel: ChildInterfaceLevel.TEEN },
+  { firstName: 'Matthieu', pin: '4444', interfaceLevel: ChildInterfaceLevel.MIDDLE },
+  { firstName: 'Damien', pin: '5555', interfaceLevel: ChildInterfaceLevel.YOUNG },
 ];
 
 /**
@@ -43,6 +44,7 @@ export async function seedDemoFamily(prisma: PrismaClient) {
       DEMO_CHILDREN.map(async (child) => ({
         firstName: child.firstName,
         pinHash: await bcrypt.hash(child.pin, SALT_ROUNDS),
+        interfaceLevel: child.interfaceLevel,
       })),
     ),
   ]);
@@ -90,6 +92,7 @@ export async function seedDemoFamily(prisma: PrismaClient) {
         role: Role.CHILD,
         firstName: child.firstName,
         pinHash: child.pinHash,
+        interfaceLevel: child.interfaceLevel,
         childAccount: {
           create: {
             balanceCents: 0,
@@ -98,6 +101,61 @@ export async function seedDemoFamily(prisma: PrismaClient) {
       },
     });
   }
+
+  // Demo chores: one daily with a pending completion (so the parent-side approval queue
+  // isn't empty out of the box), one weekly with none yet.
+  const todayStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
+  const bedChore = await prisma.chore.upsert({
+    where: { id: 'demo-chore-bed' },
+    update: {},
+    create: {
+      id: 'demo-chore-bed',
+      familyId: family.id,
+      childUserId: 'demo-elodie',
+      title: 'Faire son lit',
+      rewardCents: 50,
+      recurrence: 'DAILY',
+    },
+  });
+  await prisma.choreCompletion.upsert({
+    where: { id: 'demo-chore-completion-bed' },
+    update: {},
+    create: {
+      id: 'demo-chore-completion-bed',
+      choreId: bedChore.id,
+      periodStart: todayStart,
+      status: 'PENDING',
+      rewardType: 'MONEY',
+      rewardCents: bedChore.rewardCents,
+    },
+  });
+  await prisma.chore.upsert({
+    where: { id: 'demo-chore-room' },
+    update: {},
+    create: {
+      id: 'demo-chore-room',
+      familyId: family.id,
+      childUserId: 'demo-matthieu',
+      title: 'Ranger sa chambre',
+      rewardCents: 100,
+      recurrence: 'WEEKLY',
+    },
+  });
+  // One points-rewarded chore, so the money/points split is visible without setting one up
+  // by hand.
+  await prisma.chore.upsert({
+    where: { id: 'demo-chore-homework' },
+    update: {},
+    create: {
+      id: 'demo-chore-homework',
+      familyId: family.id,
+      childUserId: 'demo-elodie',
+      title: 'Faire ses devoirs',
+      rewardType: 'POINTS',
+      rewardPoints: 20,
+      recurrence: 'DAILY',
+    },
+  });
 
   return family;
 }

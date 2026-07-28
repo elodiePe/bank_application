@@ -28,7 +28,7 @@ export function MyAccountSettings() {
   if (!user) return null;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <h3 className="font-medium">Mon compte</h3>
       <div className="mt-3 flex flex-col gap-4">
         {user.role === 'PARENT' && (
@@ -90,7 +90,7 @@ function EmailForm({
         <button
           type="submit"
           disabled={setEmail.isPending}
-          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="rounded-full bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           Enregistrer
         </button>
@@ -174,7 +174,7 @@ function PinForm() {
         <button
           type="submit"
           disabled={changePin.isPending}
-          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="rounded-full bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           Enregistrer
         </button>

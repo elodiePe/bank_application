@@ -1,16 +1,4 @@
-export interface PermissionValues {
-  canManageMoney: boolean;
-  canManageActions: boolean;
-  canManageSettings: boolean;
-  canManageFamily: boolean;
-}
-
-export const FULL_PERMISSIONS: PermissionValues = {
-  canManageMoney: true,
-  canManageActions: true,
-  canManageSettings: true,
-  canManageFamily: true,
-};
+import type { PermissionValues } from '../utils/permissions.js';
 
 const ITEMS: { key: keyof PermissionValues; label: string }[] = [
   { key: 'canManageMoney', label: "Gérer l'argent (dépôt, retrait, virement, correction)" },

@@ -14,6 +14,10 @@ export function createChildAccountRepository(prisma: Db) {
       return prisma.childAccount.update({ where: { id }, data: { balanceCents } });
     },
 
+    incrementPoints(id: string, points: number) {
+      return prisma.childAccount.update({ where: { id }, data: { pointsBalance: { increment: points } } });
+    },
+
     listAll() {
       return prisma.childAccount.findMany({ include: { user: true } });
     },

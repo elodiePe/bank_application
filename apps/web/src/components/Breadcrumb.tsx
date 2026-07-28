@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 const PAGE_LABELS: Record<string, string> = {
   '/history': 'Historique',
   '/portfolio': 'Portefeuille',
-  '/settings': 'Paramètres',
 };
 
 export function Breadcrumb() {

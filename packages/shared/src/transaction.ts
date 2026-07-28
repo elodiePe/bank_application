@@ -9,7 +9,8 @@ export type TransactionType =
   | 'CORRECTION'
   | 'STOCK_BUY'
   | 'STOCK_SELL'
-  | 'STOCK_GIFT';
+  | 'STOCK_GIFT'
+  | 'CHORE_REWARD';
 
 export type TransactionStatus = 'PENDING' | 'COMPLETED' | 'REJECTED' | 'REVERSED';
 

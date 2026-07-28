@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import type { PrismaClient } from '@prisma/client';
-import type { FamilyMemberDetail } from '@banque-familiale/shared';
+import type { ChildInterfaceLevel, FamilyMemberDetail } from '@banque-familiale/shared';
 import { createUserRepository } from '../repositories/userRepository.js';
 import { createRefreshSessionRepository } from '../repositories/refreshSessionRepository.js';
 import { createAuditLogRepository } from '../repositories/auditLogRepository.js';
@@ -25,6 +25,7 @@ function toDetail(u: {
   canManageActions: boolean;
   canManageSettings: boolean;
   canManageFamily: boolean;
+  interfaceLevel: ChildInterfaceLevel;
 }): FamilyMemberDetail {
   return {
     id: u.id,
@@ -43,6 +44,7 @@ function toDetail(u: {
             canManageFamily: u.canManageFamily,
           }
         : null,
+    interfaceLevel: u.role === 'CHILD' ? u.interfaceLevel : null,
   };
 }
 
@@ -68,6 +70,7 @@ export function createMemberService(prisma: PrismaClient) {
     canManageActions?: boolean;
     canManageSettings?: boolean;
     canManageFamily?: boolean;
+    interfaceLevel?: ChildInterfaceLevel;
   }) {
     const pinHash = await hashPin(params.pin);
     const id = randomUUID();
@@ -88,7 +91,7 @@ export function createMemberService(prisma: PrismaClient) {
                 canManageSettings: params.canManageSettings ?? true,
                 canManageFamily: params.canManageFamily ?? true,
               }
-            : {}),
+            : { interfaceLevel: params.interfaceLevel ?? 'MIDDLE' }),
         },
       });
       if (params.role === 'CHILD') {
@@ -144,6 +147,7 @@ export function createMemberService(prisma: PrismaClient) {
       canManageActions?: boolean;
       canManageSettings?: boolean;
       canManageFamily?: boolean;
+      interfaceLevel?: ChildInterfaceLevel;
     }): Promise<FamilyMemberDetail> {
       const created = await createUser({
         familyId: params.familyId,
@@ -154,6 +158,7 @@ export function createMemberService(prisma: PrismaClient) {
         canManageActions: params.canManageActions,
         canManageSettings: params.canManageSettings,
         canManageFamily: params.canManageFamily,
+        interfaceLevel: params.interfaceLevel,
       });
 
       await auditLogRepo.record({
@@ -276,6 +281,27 @@ export function createMemberService(prisma: PrismaClient) {
         familyId,
         requesterFirstName: target.firstName,
       });
+    },
+
+    /** Change which dashboard variant a child sees — parent-only, chosen directly rather
+     * than derived from a birth date. */
+    async setChildInterfaceLevel(params: {
+      familyId: string;
+      actorId: string;
+      targetUserId: string;
+      interfaceLevel: ChildInterfaceLevel;
+    }): Promise<FamilyMemberDetail> {
+      const target = await assertBelongsToFamily(params.targetUserId, params.familyId);
+      if (target.role !== 'CHILD') {
+        throw new ValidationError("Seuls les comptes enfant ont une interface à choisir.");
+      }
+
+      await userRepo.setInterfaceLevel(target.id, params.interfaceLevel);
+
+      const full = await userRepo.listAllFamilyMembers(params.familyId);
+      const detail = full.find((m) => m.id === target.id);
+      if (!detail) throw new NotFoundError();
+      return toDetail(detail);
     },
 
     /** Admin-only: change what a non-admin parent is allowed to do. The admin flag itself

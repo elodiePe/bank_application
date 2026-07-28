@@ -10,3 +10,7 @@ export * from './member.js';
 export * from './stock.js';
 export * from './fx.js';
 export * from './dispute.js';
+export * from './chore.js';
+export * from './mealPlan.js';
+export * from './shoppingList.js';
+export * from './pointsReward.js';

@@ -59,6 +59,19 @@ export function createStockController(stockService: StockService) {
       res.status(201).json(order);
     },
 
+    async buyOrSellForChild(req: Request, res: Response) {
+      const parsed = createStockOrderSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+      const result = await stockService.buyOrSellForChild({
+        actorId: req.auth!.sub,
+        actorFamilyId: req.auth!.familyId,
+        accountId: String(req.params.accountId),
+        input: parsed.data,
+      });
+      res.status(201).json(result);
+    },
+
     async gift(req: Request, res: Response) {
       const parsed = giftStockSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.message);

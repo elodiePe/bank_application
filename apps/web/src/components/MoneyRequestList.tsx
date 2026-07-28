@@ -4,6 +4,8 @@ import type { MoneyRequestSummary } from '@banque-familiale/shared';
 import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { MONEY_REQUEST_STATUS_LABELS, MONEY_REQUEST_TYPE_LABELS } from '../utils/moneyRequestLabels.js';
 import { useApproveMoneyRequest, useCancelMoneyRequest, useRejectMoneyRequest } from '../hooks/useMoneyRequests.js';
+import { statusBackgroundClass } from '../utils/statusColors.js';
+import { TypeBadge } from './TypeBadge.js';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -50,12 +52,13 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ delay: index * 0.03 }}
-            className="relative flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            className={`relative flex items-center justify-between rounded-xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${statusBackgroundClass(r.status)}`}
           >
             <div className={canDismiss ? 'pr-6' : undefined}>
+              <TypeBadge>{MONEY_REQUEST_TYPE_LABELS[r.type]}</TypeBadge>
               <p className="font-medium">
                 {r.requesterFirstName}
-                {r.targetFirstName ? ` → ${r.targetFirstName}` : ''} · {MONEY_REQUEST_TYPE_LABELS[r.type]}
+                {r.targetFirstName ? ` → ${r.targetFirstName}` : ''}
               </p>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 {formatMoney(r.amountCents, STORAGE_CURRENCY)}

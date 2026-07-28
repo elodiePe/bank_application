@@ -105,7 +105,13 @@ describe('memberService (seeded demo family)', () => {
       role: 'CHILD',
       pin: '1234',
     });
-    expect(child).toMatchObject({ firstName: 'Nouveau', role: 'CHILD', hasPinLogin: true, isActive: true });
+    expect(child).toMatchObject({
+      firstName: 'Nouveau',
+      role: 'CHILD',
+      hasPinLogin: true,
+      isActive: true,
+      interfaceLevel: 'MIDDLE', // default when omitted
+    });
 
     const account = await db.prisma.childAccount.findUnique({ where: { userId: child.id } });
     expect(account?.balanceCents).toBe(0);
@@ -117,7 +123,36 @@ describe('memberService (seeded demo family)', () => {
       role: 'PARENT',
       pin: '6543',
     });
-    expect(parent).toMatchObject({ role: 'PARENT', hasPinLogin: true });
+    expect(parent).toMatchObject({ role: 'PARENT', hasPinLogin: true, interfaceLevel: null });
+  });
+
+  it("lets a parent choose a child's interface level explicitly, and change it later", async () => {
+    const child = await service.addFamilyMember({
+      familyId: 'demo-family',
+      actorId: 'demo-papa',
+      firstName: 'Petit',
+      role: 'CHILD',
+      pin: '2468',
+      interfaceLevel: 'YOUNG',
+    });
+    expect(child.interfaceLevel).toBe('YOUNG');
+
+    const updated = await service.setChildInterfaceLevel({
+      familyId: 'demo-family',
+      actorId: 'demo-papa',
+      targetUserId: child.id,
+      interfaceLevel: 'TEEN',
+    });
+    expect(updated.interfaceLevel).toBe('TEEN');
+
+    await expect(
+      service.setChildInterfaceLevel({
+        familyId: 'demo-family',
+        actorId: 'demo-papa',
+        targetUserId: 'demo-papa',
+        interfaceLevel: 'YOUNG',
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
   });
 
   it('lets a parent reset another member\'s PIN, invalidating their sessions', async () => {

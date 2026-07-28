@@ -56,7 +56,7 @@ export function LandingPage() {
           </Link>
           <Link
             to="/register"
-            className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+            className="rounded-full bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
           >
             Créer une famille
           </Link>
@@ -100,7 +100,7 @@ export function LandingPage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="rounded-2xl border border-slate-200 p-5 dark:border-slate-800"
+              className="rounded-2xl border border-slate-200 p-5 dark:border-slate-700"
             >
               <span className="text-2xl">{feature.icon}</span>
               <h2 className="mt-2 font-semibold">{feature.title}</h2>

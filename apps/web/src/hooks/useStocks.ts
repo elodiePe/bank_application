@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateStockOrderInput, GiftStockInput } from '@banque-familiale/shared';
 import {
   approveStockOrder,
+  buyOrSellForChild,
   cancelStockOrder,
   createStockOrder,
   fetchChildPortfolio,
@@ -98,6 +99,15 @@ export function useGiftStock() {
   const invalidate = useInvalidateStocksAndDashboard();
   return useMutation({
     mutationFn: (input: GiftStockInput) => giftStock(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useBuyOrSellForChild() {
+  const invalidate = useInvalidateStocksAndDashboard();
+  return useMutation({
+    mutationFn: ({ accountId, input }: { accountId: string; input: CreateStockOrderInput }) =>
+      buyOrSellForChild(accountId, input),
     onSuccess: invalidate,
   });
 }

@@ -3,6 +3,7 @@ import type { ChildBalanceSummary } from '@banque-familiale/shared';
 import { useChildPortfolio } from '../hooks/useStocks.js';
 import { formatMoney } from '../utils/currency.js';
 import { GiftStockModal } from './GiftStockModal.js';
+import { StockOrderModal } from './StockOrderModal.js';
 
 // Stock prices come straight from Finnhub, always in USD — never the family's configured
 // display currency, and formatMoney doesn't convert, only relabels, so this must stay fixed.
@@ -17,12 +18,14 @@ interface ChildPortfolioSummaryProps {
 export function ChildPortfolioSummary({ child, canOffer = true }: ChildPortfolioSummaryProps) {
   const portfolio = useChildPortfolio(child.accountId);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [sellTarget, setSellTarget] = useState<{ symbol: string; companyName: string } | null>(null);
 
   const holdings = portfolio.data?.holdings ?? [];
   const totalValue = portfolio.data?.totalMarketValueCents ?? 0;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 font-semibold text-white">
@@ -38,21 +41,45 @@ export function ChildPortfolioSummary({ child, canOffer = true }: ChildPortfolio
           </div>
         </div>
         {canOffer && (
-          <button
-            type="button"
-            onClick={() => setGiftOpen(true)}
-            className="rounded-lg bg-brand-100 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-200 dark:bg-brand-900/40 dark:text-brand-400 dark:hover:bg-brand-900/70"
-          >
-            🎁 Offrir
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setBuyOpen(true)}
+              aria-label="Acheter une action"
+              title="Acheter"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/70"
+            >
+              +
+            </button>
+            {/* <button
+              type="button"
+              onClick={() => setGiftOpen(true)}
+              className="rounded-lg bg-brand-100 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-200 dark:bg-brand-900/40 dark:text-brand-400 dark:hover:bg-brand-900/70"
+            >
+              Offrir
+            </button> */}
+          </div>
         )}
       </div>
 
       {holdings.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-0.5 border-t border-slate-200 pt-3 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <ul className="mt-3 flex flex-col gap-1 border-t border-slate-200 pt-3 dark:border-slate-700">
           {holdings.map((h) => (
-            <li key={h.id}>
-              {h.symbol} · {h.quantity} titre{h.quantity > 1 ? 's' : ''}
+            <li key={h.id} className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+              <span>
+                {h.symbol} · {h.quantity} titre{h.quantity > 1 ? 's' : ''}
+              </span>
+              {canOffer && (
+                <button
+                  type="button"
+                  onClick={() => setSellTarget({ symbol: h.symbol, companyName: h.companyName })}
+                  aria-label={`Vendre ${h.symbol}`}
+                  title="Vendre"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/70"
+                >
+                  −
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -63,6 +90,18 @@ export function ChildPortfolioSummary({ child, canOffer = true }: ChildPortfolio
           accountId={child.accountId}
           childFirstName={child.firstName}
           onClose={() => setGiftOpen(false)}
+        />
+      )}
+      {buyOpen && (
+        <StockOrderModal mode="BUY" forChildAccountId={child.accountId} onClose={() => setBuyOpen(false)} />
+      )}
+      {sellTarget && (
+        <StockOrderModal
+          mode="SELL"
+          forChildAccountId={child.accountId}
+          initialSymbol={sellTarget.symbol}
+          initialCompanyName={sellTarget.companyName}
+          onClose={() => setSellTarget(null)}
         />
       )}
     </div>

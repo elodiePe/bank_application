@@ -61,6 +61,7 @@ export function createDashboardService(deps: {
           firstName: u.firstName,
           balanceCents: u.childAccount!.balanceCents,
           weeklyAllowanceCents: u.childAccount!.weeklyAllowanceCents,
+          pointsBalance: u.childAccount!.pointsBalance,
         }));
 
       const totalBalanceCents = children.reduce((sum, c) => sum + c.balanceCents, 0);
@@ -95,6 +96,7 @@ export function createDashboardService(deps: {
       return {
         balanceCents: account.balanceCents,
         weeklyAllowanceCents: account.weeklyAllowanceCents,
+        pointsBalance: account.pointsBalance,
         siblings,
       };
     },

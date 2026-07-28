@@ -74,7 +74,7 @@ export function GiftStockModal({ accountId, childFirstName, onClose }: GiftStock
         </p>
 
         {holdings.length > 0 && (
-          <div className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
+          <div className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
             <p className="mb-1 font-medium">Portefeuille actuel</p>
             <ul className="flex flex-col gap-0.5 text-slate-500 dark:text-slate-400">
               {holdings.map((h) => (
@@ -102,7 +102,7 @@ export function GiftStockModal({ accountId, childFirstName, onClose }: GiftStock
             />
             {search.isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Recherche…</p>}
             {search.data && search.data.length > 0 && (
-              <ul className="max-h-48 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+              <ul className="max-h-48 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-700">
                 {search.data.map((r) => (
                   <li key={r.symbol}>
                     <button
@@ -122,7 +122,7 @@ export function GiftStockModal({ accountId, childFirstName, onClose }: GiftStock
 
         {selected && (
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
-            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
               <p className="font-medium">
                 {selected.symbol}{' '}
                 <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
@@ -185,7 +185,7 @@ export function GiftStockModal({ accountId, childFirstName, onClose }: GiftStock
             <button
               type="submit"
               disabled={giftStock.isPending}
-              className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+              className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
             >
               {giftStock.isPending ? 'Envoi…' : 'Offrir ces actions'}
             </button>

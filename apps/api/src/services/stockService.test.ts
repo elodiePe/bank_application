@@ -307,4 +307,76 @@ describe('stockService (seeded demo family)', () => {
       ).rejects.toBeInstanceOf(ForbiddenError);
     });
   });
+
+  describe('buyOrSellForChild', () => {
+    it('a parent buys directly for a child: debits the balance and creates the holding immediately, no pending order', async () => {
+      const account = await db.prisma.childAccount.findFirstOrThrow({ where: { userId: 'demo-matthieu' } });
+      const balanceBefore = account.balanceCents;
+
+      const result = await service.buyOrSellForChild({
+        actorId: 'demo-papa',
+        actorFamilyId: 'demo-family',
+        accountId: account.id,
+        input: { type: 'BUY', symbol: 'AAPL', companyName: 'Apple Inc', quantity: 2 },
+      });
+
+      expect(result).toMatchObject({ type: 'BUY', status: 'APPROVED', symbol: 'AAPL', quantity: 2, childFirstName: 'Matthieu' });
+
+      const accountAfter = await db.prisma.childAccount.findUniqueOrThrow({ where: { id: account.id } });
+      expect(accountAfter.balanceCents).toBe(balanceBefore - 2 * 15_000);
+
+      const holding = await db.prisma.stockHolding.findUniqueOrThrow({
+        where: { accountId_symbol: { accountId: account.id, symbol: 'AAPL' } },
+      });
+      expect(holding.quantity).toBe(2);
+    });
+
+    it('a parent sells directly for a child: credits the balance and reduces the holding', async () => {
+      const account = await db.prisma.childAccount.findFirstOrThrow({ where: { userId: 'demo-matthieu' } });
+      const balanceBefore = account.balanceCents;
+
+      const result = await service.buyOrSellForChild({
+        actorId: 'demo-papa',
+        actorFamilyId: 'demo-family',
+        accountId: account.id,
+        input: { type: 'SELL', symbol: 'AAPL', companyName: 'Apple Inc', quantity: 1 },
+      });
+
+      expect(result).toMatchObject({ type: 'SELL', status: 'APPROVED', symbol: 'AAPL', quantity: 1 });
+
+      const accountAfter = await db.prisma.childAccount.findUniqueOrThrow({ where: { id: account.id } });
+      expect(accountAfter.balanceCents).toBe(balanceBefore + 1 * 15_000);
+
+      const holding = await db.prisma.stockHolding.findUniqueOrThrow({
+        where: { accountId_symbol: { accountId: account.id, symbol: 'AAPL' } },
+      });
+      expect(holding.quantity).toBe(1);
+    });
+
+    it('refuses to overdraw when buying directly for a child', async () => {
+      const account = await db.prisma.childAccount.findFirstOrThrow({ where: { userId: 'demo-matthieu' } });
+
+      await expect(
+        service.buyOrSellForChild({
+          actorId: 'demo-papa',
+          actorFamilyId: 'demo-family',
+          accountId: account.id,
+          input: { type: 'BUY', symbol: 'RICH', quantity: 1 },
+        }),
+      ).rejects.toBeInstanceOf(InsufficientFundsError);
+    });
+
+    it('refuses to act on an account from another family', async () => {
+      const account = await db.prisma.childAccount.findFirstOrThrow({ where: { userId: 'demo-matthieu' } });
+
+      await expect(
+        service.buyOrSellForChild({
+          actorId: 'demo-papa',
+          actorFamilyId: 'not-demo-family',
+          accountId: account.id,
+          input: { type: 'BUY', symbol: 'AAPL', quantity: 1 },
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+  });
 });

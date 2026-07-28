@@ -53,7 +53,7 @@ export function NotificationBell() {
               // Anchored to the viewport's right edge (not the bell button) so the panel
               // never gets clipped off-screen on narrow phones where the bell isn't the
               // last header item.
-              className="fixed right-3 top-14 z-50 max-h-96 w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl sm:absolute sm:right-0 sm:top-auto sm:mt-2 dark:border-slate-800 dark:bg-slate-900"
+              className="fixed right-3 top-14 z-50 max-h-96 w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl sm:absolute sm:right-0 sm:top-auto sm:mt-2 dark:border-slate-700 dark:bg-slate-800"
             >
               <div className="mb-1 flex items-center justify-between px-2 py-1">
                 <span className="text-sm font-semibold">Notifications</span>

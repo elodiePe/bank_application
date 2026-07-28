@@ -45,7 +45,7 @@ export function ResetCredentialModal({ memberId, memberFirstName, onClose }: Res
         <button
           type="submit"
           disabled={resetPin.isPending}
-          className="mt-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {resetPin.isPending ? 'Enregistrement…' : 'Enregistrer'}
         </button>

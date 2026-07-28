@@ -16,6 +16,11 @@ export type NotificationType =
   | 'CREDENTIAL_RESET_REQUESTED'
   | 'DISPUTE_RAISED'
   | 'DISPUTE_DISMISSED'
+  | 'CHORE_COMPLETED'
+  | 'CHORE_APPROVED'
+  | 'CHORE_REJECTED'
+  | 'CHORE_REMINDER'
+  | 'MEAL_PLAN_TURN'
   | 'GENERIC';
 
 export interface NotificationSummary {
@@ -28,6 +33,9 @@ export interface NotificationSummary {
   relatedTransactionId: string | null;
   relatedMoneyRequestId: string | null;
   relatedDisputeId: string | null;
+  relatedChoreCompletionId: string | null;
+  /// Set only for CHORE_REMINDER (fires before any completion exists).
+  relatedChoreId: string | null;
 }
 
 export interface PushSubscriptionKeys {
