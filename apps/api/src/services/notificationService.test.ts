@@ -86,21 +86,19 @@ describe('notificationService (seeded demo family)', () => {
     expect(damienNotifs.some((n) => n.title === 'Virement reçu')).toBe(true);
   });
 
-  it('counts unread and marks notifications as read, scoped to the right user', async () => {
-    const before = await service.countUnread('demo-elodie');
-    expect(before).toBeGreaterThan(0);
+  it('deletes a notification, scoped to the right user, and deletes them all on request', async () => {
+    const before = await service.listMine('demo-elodie');
+    expect(before.length).toBeGreaterThan(0);
 
-    const [first] = await service.listMine('demo-elodie');
-    // A different user can't mark someone else's notification as read.
-    await service.markAsRead(first!.id, 'demo-matthieu');
-    const stillUnread = await service.countUnread('demo-elodie');
-    expect(stillUnread).toBe(before);
+    const [first] = before;
+    // A different user can't delete someone else's notification.
+    await service.deleteOne(first!.id, 'demo-matthieu');
+    expect(await service.listMine('demo-elodie')).toHaveLength(before.length);
 
-    await service.markAsRead(first!.id, 'demo-elodie');
-    const afterOne = await service.countUnread('demo-elodie');
-    expect(afterOne).toBe(before - 1);
+    await service.deleteOne(first!.id, 'demo-elodie');
+    expect(await service.listMine('demo-elodie')).toHaveLength(before.length - 1);
 
-    await service.markAllAsRead('demo-elodie');
-    expect(await service.countUnread('demo-elodie')).toBe(0);
+    await service.deleteAllForUser('demo-elodie');
+    expect(await service.listMine('demo-elodie')).toHaveLength(0);
   });
 });

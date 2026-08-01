@@ -3,12 +3,11 @@ import { Link, Navigate } from 'react-router-dom';
 import type { DisputeSummary, TransactionSummary } from '@banque-familiale/shared';
 import { useCurrentUser, usePermission } from '../hooks/useAuth.js';
 import { useMyRequests, usePendingRequests } from '../hooks/useMoneyRequests.js';
-import { useMyDisputes, usePendingDisputes, useResolveDispute } from '../hooks/useDisputes.js';
+import { useClearDispute, useMyDisputes, usePendingDisputes, useResolveDispute } from '../hooks/useDisputes.js';
 import { useApproveChoreCompletion, usePendingChoreCompletions, useRejectChoreCompletion } from '../hooks/useChores.js';
 import { useChildOverview } from '../hooks/useDashboard.js';
 import { useMealPlanUpcoming } from '../hooks/useMealPlan.js';
 import { useLaundryUpcoming } from '../hooks/useLaundry.js';
-import { useDismissedIds } from '../hooks/useDismissedIds.js';
 import { useShortcutOrder, type ShortcutKey } from '../hooks/useShortcutUsage.js';
 import { MoneyRequestList } from '../components/MoneyRequestList.js';
 import { RequestMoneyModal } from '../components/RequestMoneyModal.js';
@@ -287,8 +286,8 @@ function ChildHomePage() {
   const overview = useChildOverview();
   const requests = useMyRequests();
   const disputes = useMyDisputes();
+  const clearDispute = useClearDispute();
   const [requestOpen, setRequestOpen] = useState(false);
-  const { dismissed: dismissedDisputeIds, dismiss: dismissDispute } = useDismissedIds(user?.id, 'disputes');
 
   const receivedPending = (requests.data ?? []).filter(
     (r) => r.status === 'PENDING' && r.targetUserId === user?.id,
@@ -340,18 +339,18 @@ function ChildHomePage() {
           />
         )}
         {(() => {
-          const visibleDisputes = (disputes.data ?? []).filter((d) => !dismissedDisputeIds.has(d.id));
+          const visibleDisputes = disputes.data ?? [];
           if (visibleDisputes.length === 0) return null;
           return (
             <ul className="mt-3 flex flex-col gap-2">
               {visibleDisputes.map((d) => {
-                const canDismiss = d.status !== 'PENDING';
+                const canClear = d.status !== 'PENDING';
                 return (
                   <li
                     key={d.id}
                     className={`relative rounded-xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${statusBackgroundClass(d.status)}`}
                   >
-                    <div className={canDismiss ? 'pr-6' : undefined}>
+                    <div className={canClear ? 'pr-6' : undefined}>
                       <TypeBadge>Signalement</TypeBadge>
                       <p className="font-medium">
                         {TRANSACTION_TYPE_LABELS[d.transactionType]} · {formatMoney(d.transactionAmountCents, STORAGE_CURRENCY)}
@@ -360,11 +359,12 @@ function ChildHomePage() {
                         {d.reason} · {DISPUTE_STATUS_LABELS[d.status]}
                       </p>
                     </div>
-                    {canDismiss && (
+                    {canClear && (
                       <button
                         type="button"
-                        onClick={() => dismissDispute(d.id)}
-                        aria-label="Masquer ce signalement"
+                        onClick={() => clearDispute.mutate(d.id)}
+                        disabled={clearDispute.isPending}
+                        aria-label="Supprimer ce signalement"
                         className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-slate-300 hover:bg-slate-100 hover:text-slate-500 dark:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                       >
                         <svg viewBox="0 0 20 20" fill="none" className="h-3 w-3" aria-hidden>

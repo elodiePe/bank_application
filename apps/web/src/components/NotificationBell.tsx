@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  useMarkAllNotificationsAsRead,
-  useMarkNotificationAsRead,
-  useMyNotifications,
-  useUnreadNotificationCount,
-} from '../hooks/useNotifications.js';
+import { useDeleteAllNotifications, useDeleteNotification, useMyNotifications } from '../hooks/useNotifications.js';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('fr-CH', {
@@ -18,13 +13,12 @@ function formatDateTime(iso: string): string {
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const unread = useUnreadNotificationCount();
   const notifications = useMyNotifications();
-  const markAsRead = useMarkNotificationAsRead();
-  const markAllAsRead = useMarkAllNotificationsAsRead();
+  const deleteNotification = useDeleteNotification();
+  const deleteAll = useDeleteAllNotifications();
 
-  const unreadCount = unread.data?.count ?? 0;
-  const visibleNotifications = notifications.data?.filter((n) => !n.isRead) ?? [];
+  const visibleNotifications = notifications.data ?? [];
+  const count = visibleNotifications.length;
 
   return (
     <div className="relative">
@@ -35,9 +29,9 @@ export function NotificationBell() {
         className="relative flex h-9 w-9 items-center justify-center rounded-full text-lg hover:bg-slate-100 dark:hover:bg-slate-800"
       >
         🔔
-        {unreadCount > 0 && (
+        {count > 0 && (
           <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {count > 9 ? '9+' : count}
           </span>
         )}
       </button>
@@ -57,13 +51,13 @@ export function NotificationBell() {
             >
               <div className="mb-1 flex items-center justify-between px-2 py-1">
                 <span className="text-sm font-semibold">Notifications</span>
-                {unreadCount > 0 && (
+                {count > 0 && (
                   <button
                     type="button"
-                    onClick={() => markAllAsRead.mutate()}
+                    onClick={() => deleteAll.mutate()}
                     className="text-xs text-brand-600 hover:underline dark:text-brand-400"
                   >
-                    Tout marquer comme lu
+                    Tout supprimer
                   </button>
                 )}
               </div>
@@ -78,7 +72,7 @@ export function NotificationBell() {
                 {visibleNotifications.map((n) => (
                   <li
                     key={n.id}
-                    onClick={() => markAsRead.mutate(n.id)}
+                    onClick={() => deleteNotification.mutate(n.id)}
                     className="cursor-pointer rounded-lg bg-brand-50 p-2 text-sm hover:bg-brand-100 dark:bg-brand-900/20 dark:hover:bg-brand-900/40"
                   >
                     <p className="font-medium">{n.title}</p>

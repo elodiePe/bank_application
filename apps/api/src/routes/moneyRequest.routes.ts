@@ -37,6 +37,9 @@ export function createMoneyRequestRouter(prisma: PrismaClient) {
     requireRole('CHILD'),
     asyncHandler((req, res) => controller.cancel(req, res)),
   );
+  // Only the requester can ever see a resolved request (see moneyRequestService.clear) — no
+  // requireRole needed beyond auth, the service checks ownership directly.
+  router.post('/:id/clear', asyncHandler((req, res) => controller.clear(req, res)));
 
   return router;
 }

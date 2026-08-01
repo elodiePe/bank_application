@@ -51,6 +51,10 @@ export function createDisputeRepository(prisma: Db) {
         orderBy: { createdAt: 'desc' },
       });
     },
+
+    async delete(id: string) {
+      await prisma.dispute.delete({ where: { id } });
+    },
   };
 }
 

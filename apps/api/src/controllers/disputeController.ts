@@ -44,6 +44,15 @@ export function createDisputeController(disputeService: DisputeService) {
       });
       res.json(dispute);
     },
+
+    async clear(req: Request, res: Response) {
+      await disputeService.clear({
+        disputeId: String(req.params.id),
+        actorId: req.auth!.sub,
+        actorFamilyId: req.auth!.familyId,
+      });
+      res.status(204).end();
+    },
   };
 }
 

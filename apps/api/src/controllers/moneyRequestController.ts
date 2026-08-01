@@ -54,6 +54,15 @@ export function createMoneyRequestController(moneyRequestService: MoneyRequestSe
       });
       res.json(request);
     },
+
+    async clear(req: Request, res: Response) {
+      await moneyRequestService.clear({
+        requestId: String(req.params.id),
+        actorId: req.auth!.sub,
+        actorFamilyId: req.auth!.familyId,
+      });
+      res.status(204).end();
+    },
   };
 }
 

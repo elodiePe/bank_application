@@ -42,6 +42,9 @@ export function createDisputeRouter(prisma: PrismaClient) {
     requirePermission('canManageActions'),
     asyncHandler((req, res) => controller.resolve(req, res)),
   );
+  // Only the raising child can ever see a resolved dispute (see disputeService.clear) — no
+  // requireRole needed beyond auth, the service checks ownership directly.
+  router.post('/:id/clear', asyncHandler((req, res) => controller.clear(req, res)));
 
   return router;
 }

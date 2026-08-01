@@ -149,6 +149,27 @@ export function createDisputeService(prisma: PrismaClient) {
       const transaction = await prisma.transaction.findUniqueOrThrow({ where: { id: updated.transactionId } });
       return toSummary(updated, transaction);
     },
+
+    /// Once resolved (dismissed/resolved), a dispute is only ever shown to the child who raised
+    /// it — parents only ever see PENDING ones (the UI has no resolved-history view for them) —
+    /// so clearing it from the raiser's own list is already "every account that can see it,"
+    /// and it's safe to hard-delete right away. Distinct from `dismiss` above, which is the
+    /// parent-facing action of rejecting the reported error as invalid.
+    async clear(params: { disputeId: string; actorId: string; actorFamilyId: string }): Promise<void> {
+      const disputeRepo = createDisputeRepository(prisma);
+      const dispute = await disputeRepo.findByIdOrThrow(params.disputeId);
+      if (dispute.raisedBy.familyId !== params.actorFamilyId) {
+        throw new ForbiddenError();
+      }
+      if (dispute.status === 'PENDING') {
+        throw new InvalidRequestStateError();
+      }
+      if (dispute.raisedById !== params.actorId) {
+        throw new ForbiddenError('Seul l\'auteur du signalement peut le supprimer');
+      }
+
+      await disputeRepo.delete(dispute.id);
+    },
   };
 }
 

@@ -19,16 +19,14 @@ export function createNotificationRepository(prisma: Db) {
       });
     },
 
-    countUnread(userId: string) {
-      return prisma.notification.count({ where: { userId, isRead: false } });
+    /// Scoped to `userId` so a guessed/stale id can never delete another member's notification —
+    /// each row belongs to exactly one recipient, so deleting it here doesn't touch anyone else's.
+    async deleteOne(id: string, userId: string) {
+      await prisma.notification.deleteMany({ where: { id, userId } });
     },
 
-    async markAsRead(id: string, userId: string) {
-      await prisma.notification.updateMany({ where: { id, userId }, data: { isRead: true } });
-    },
-
-    async markAllAsRead(userId: string) {
-      await prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } });
+    async deleteAllForUser(userId: string) {
+      await prisma.notification.deleteMany({ where: { userId } });
     },
   };
 }

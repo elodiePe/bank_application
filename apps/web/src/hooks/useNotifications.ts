@@ -1,10 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  fetchMyNotifications,
-  fetchUnreadCount,
-  markAllNotificationsAsRead,
-  markNotificationAsRead,
-} from '../services/notification.service.js';
+import { deleteAllNotifications, deleteNotification, fetchMyNotifications } from '../services/notification.service.js';
 
 export function useMyNotifications() {
   return useQuery({
@@ -14,32 +9,26 @@ export function useMyNotifications() {
   });
 }
 
-export function useUnreadNotificationCount() {
-  return useQuery({
-    queryKey: ['notifications', 'unread-count'],
-    queryFn: fetchUnreadCount,
-    staleTime: 10_000,
-    refetchInterval: 20_000,
-  });
-}
-
 function useInvalidateNotifications() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: ['notifications'] });
 }
 
-export function useMarkNotificationAsRead() {
+/** Reading a notification and deleting it are the same action here — each row belongs to
+ * exactly one recipient (no other account can ever see it), so there's nothing to keep once
+ * this account has acknowledged it. */
+export function useDeleteNotification() {
   const invalidate = useInvalidateNotifications();
   return useMutation({
-    mutationFn: (id: string) => markNotificationAsRead(id),
+    mutationFn: (id: string) => deleteNotification(id),
     onSuccess: invalidate,
   });
 }
 
-export function useMarkAllNotificationsAsRead() {
+export function useDeleteAllNotifications() {
   const invalidate = useInvalidateNotifications();
   return useMutation({
-    mutationFn: markAllNotificationsAsRead,
+    mutationFn: deleteAllNotifications,
     onSuccess: invalidate,
   });
 }

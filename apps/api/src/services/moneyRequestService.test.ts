@@ -259,4 +259,34 @@ describe('moneyRequestService (seeded demo family)', () => {
     expect(elodieNotifs).toHaveLength(1);
     expect(papaApprovalNotifs).toHaveLength(0);
   });
+
+  it('refuses to clear a request that is still pending', async () => {
+    const request = await service.createRequest({
+      requesterId: 'demo-elodie',
+      familyId: 'demo-family',
+      type: 'DEPOSIT_REQUEST',
+      amountCents: 150,
+    });
+
+    await expect(
+      service.clear({ requestId: request.id, actorId: 'demo-elodie', actorFamilyId: 'demo-family' }),
+    ).rejects.toBeInstanceOf(InvalidRequestStateError);
+  });
+
+  it('only the requester can clear a resolved request, and it is actually removed from the database', async () => {
+    const request = await service.createRequest({
+      requesterId: 'demo-elodie',
+      familyId: 'demo-family',
+      type: 'DEPOSIT_REQUEST',
+      amountCents: 150,
+    });
+    await service.cancel({ requestId: request.id, actorId: 'demo-elodie' });
+
+    await expect(
+      service.clear({ requestId: request.id, actorId: 'demo-papa', actorFamilyId: 'demo-family' }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    await service.clear({ requestId: request.id, actorId: 'demo-elodie', actorFamilyId: 'demo-family' });
+    expect(await db.prisma.moneyRequest.findUnique({ where: { id: request.id } })).toBeNull();
+  });
 });

@@ -24,3 +24,7 @@ export function rejectMoneyRequest(id: string): Promise<MoneyRequestSummary> {
 export function cancelMoneyRequest(id: string): Promise<MoneyRequestSummary> {
   return apiPost<MoneyRequestSummary>(`/money-requests/${id}/cancel`);
 }
+
+export function clearMoneyRequest(id: string): Promise<void> {
+  return apiPost<void>(`/money-requests/${id}/clear`);
+}

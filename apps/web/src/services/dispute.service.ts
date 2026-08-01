@@ -20,3 +20,7 @@ export function dismissDispute(id: string): Promise<DisputeSummary> {
 export function resolveDispute(id: string): Promise<DisputeSummary> {
   return apiPost<DisputeSummary>(`/disputes/${id}/resolve`);
 }
+
+export function clearDispute(id: string): Promise<void> {
+  return apiPost<void>(`/disputes/${id}/clear`);
+}

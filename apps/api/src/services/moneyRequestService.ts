@@ -246,6 +246,26 @@ export function createMoneyRequestService(prisma: PrismaClient) {
       });
       return toSummary(updated);
     },
+
+    /// Once resolved (approved/rejected/cancelled), this record is only ever shown to its own
+    /// requester (parents and the other sibling only ever see PENDING requests — the UI has no
+    /// resolved-history view for them) — so clearing it from the requester's own list is
+    /// already "every account that can see it," and it's safe to hard-delete right away.
+    async clear(params: { requestId: string; actorId: string; actorFamilyId: string }): Promise<void> {
+      const moneyRequestRepo = createMoneyRequestRepository(prisma);
+      const request = await moneyRequestRepo.findByIdOrThrow(params.requestId);
+      if (request.requester.familyId !== params.actorFamilyId) {
+        throw new ForbiddenError();
+      }
+      if (request.status === 'PENDING') {
+        throw new InvalidRequestStateError();
+      }
+      if (request.requesterId !== params.actorId) {
+        throw new ForbiddenError('Seul le demandeur peut supprimer cette demande');
+      }
+
+      await moneyRequestRepo.delete(request.id);
+    },
   };
 }
 

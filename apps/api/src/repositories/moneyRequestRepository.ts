@@ -50,6 +50,10 @@ export function createMoneyRequestRepository(prisma: Db) {
         orderBy: { createdAt: 'desc' },
       });
     },
+
+    async delete(id: string) {
+      await prisma.moneyRequest.delete({ where: { id } });
+    },
   };
 }
 

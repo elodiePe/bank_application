@@ -3,8 +3,12 @@ import { motion } from 'framer-motion';
 import type { MoneyRequestSummary } from '@banque-familiale/shared';
 import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { MONEY_REQUEST_STATUS_LABELS, MONEY_REQUEST_TYPE_LABELS } from '../utils/moneyRequestLabels.js';
-import { useApproveMoneyRequest, useCancelMoneyRequest, useRejectMoneyRequest } from '../hooks/useMoneyRequests.js';
-import { useDismissedIds } from '../hooks/useDismissedIds.js';
+import {
+  useApproveMoneyRequest,
+  useCancelMoneyRequest,
+  useClearMoneyRequest,
+  useRejectMoneyRequest,
+} from '../hooks/useMoneyRequests.js';
 import { statusBackgroundClass } from '../utils/statusColors.js';
 import { TypeBadge } from './TypeBadge.js';
 import { Modal } from './Modal.js';
@@ -24,12 +28,10 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
   const approve = useApproveMoneyRequest();
   const reject = useRejectMoneyRequest();
   const cancel = useCancelMoneyRequest();
-  const { dismissed: dismissedIds, dismiss } = useDismissedIds(viewerId, 'money-requests');
+  const clear = useClearMoneyRequest();
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
 
-  const visibleRequests = requests.filter((r) => !dismissedIds.has(r.id));
-
-  if (visibleRequests.length === 0) {
+  if (requests.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
         {emptyLabel}
@@ -40,14 +42,16 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
   return (
     <>
     <ul className="flex flex-col gap-2">
-      {visibleRequests.map((r, index) => {
+      {requests.map((r, index) => {
         const isRequester = r.requesterId === viewerId;
         const canRespond =
           r.status === 'PENDING' &&
           !isRequester &&
           (r.type === 'TRANSFER_REQUEST' ? r.targetUserId === viewerId : viewerRole === 'PARENT');
         const canCancel = r.status === 'PENDING' && isRequester;
-        const canDismiss = r.status !== 'PENDING';
+        // Only the requester can clear a resolved request — the backend only ever shows one
+        // to anyone else while it's still PENDING, so this only ever renders for them anyway.
+        const canClear = r.status !== 'PENDING' && isRequester;
 
         return (
           <motion.li
@@ -58,7 +62,7 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
             transition={{ delay: index * 0.03 }}
             className={`relative flex items-center justify-between rounded-xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${statusBackgroundClass(r.status)}`}
           >
-            <div className={canDismiss ? 'pr-6' : undefined}>
+            <div className={canClear ? 'pr-6' : undefined}>
               <TypeBadge>{MONEY_REQUEST_TYPE_LABELS[r.type]}</TypeBadge>
               <p className="font-medium">
                 {r.requesterFirstName}
@@ -118,11 +122,12 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
               )}
             </div>
             )}
-            {canDismiss && (
+            {canClear && (
               <button
                 type="button"
-                onClick={() => dismiss(r.id)}
-                aria-label="Masquer cette demande"
+                onClick={() => clear.mutate(r.id)}
+                disabled={clear.isPending}
+                aria-label="Supprimer cette demande"
                 className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-slate-300 hover:bg-slate-100 hover:text-slate-500 dark:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
               >
                 <svg viewBox="0 0 20 20" fill="none" className="h-3 w-3" aria-hidden>

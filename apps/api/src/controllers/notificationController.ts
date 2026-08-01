@@ -12,18 +12,13 @@ export function createNotificationController(notificationService: NotificationSe
       res.json(notifications);
     },
 
-    async unreadCount(req: Request, res: Response) {
-      const count = await notificationService.countUnread(req.auth!.sub);
-      res.json({ count });
-    },
-
-    async markAsRead(req: Request, res: Response) {
-      await notificationService.markAsRead(String(req.params.id), req.auth!.sub);
+    async deleteOne(req: Request, res: Response) {
+      await notificationService.deleteOne(String(req.params.id), req.auth!.sub);
       res.status(204).end();
     },
 
-    async markAllAsRead(req: Request, res: Response) {
-      await notificationService.markAllAsRead(req.auth!.sub);
+    async deleteAll(req: Request, res: Response) {
+      await notificationService.deleteAllForUser(req.auth!.sub);
       res.status(204).end();
     },
 
