@@ -50,15 +50,25 @@ export function createNotificationService(prisma: PrismaClient) {
   const pushService = createPushService(prisma);
 
   /** Writes the in-app notification, then best-effort pushes the same content to the device.
-   * `url` is push-only (never persisted) — it's what the OS notification deep-links to. */
+   * `url` is push-only (never persisted) — it's what the OS notification deep-links to.
+   *
+   * The push send is deliberately NOT awaited: it's a real network call to an external push
+   * service (FCM/Mozilla) that can take seconds, especially for a stale subscription that has
+   * to fail before the caller gives up — awaiting it here would block the HTTP response for
+   * every action that notifies someone (creating a request, validating a chore, …) on a
+   * best-effort side effect that already handles its own errors internally. The in-app
+   * notification row (what actually matters for correctness) is still written and awaited
+   * before this returns. */
   async function createAndPush(data: Parameters<typeof notificationRepo.create>[0], url: string) {
     await notificationRepo.create(data);
-    await pushService.sendToUser(data.userId, { title: data.title, body: data.body, url });
+    void pushService.sendToUser(data.userId, { title: data.title, body: data.body, url }).catch((err) => {
+      console.error('[push] background send failed', err);
+    });
   }
 
   async function createManyAndPush(data: Parameters<typeof notificationRepo.createMany>[0], url: string) {
     await notificationRepo.createMany(data);
-    await Promise.allSettled(
+    void Promise.allSettled(
       data.map((n) => pushService.sendToUser(n.userId, { title: n.title, body: n.body, url })),
     );
   }
@@ -69,16 +79,12 @@ export function createNotificationService(prisma: PrismaClient) {
       return notifications.map(toSummary);
     },
 
-    countUnread(userId: string) {
-      return notificationRepo.countUnread(userId);
+    deleteOne(id: string, userId: string) {
+      return notificationRepo.deleteOne(id, userId);
     },
 
-    markAsRead(id: string, userId: string) {
-      return notificationRepo.markAsRead(id, userId);
-    },
-
-    markAllAsRead(userId: string) {
-      return notificationRepo.markAllAsRead(userId);
+    deleteAllForUser(userId: string) {
+      return notificationRepo.deleteAllForUser(userId);
     },
 
     async notifyParentsOfRequest(params: {

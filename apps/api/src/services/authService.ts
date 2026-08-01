@@ -101,25 +101,32 @@ export function createAuthService(
 
     const valid = await strategy.verify(user, credential);
     if (!valid) {
-      await deps.userRepository.recordFailedLogin(userId, { maxAttempts, lockoutMs });
-      await deps.auditLogRepository.record({
-        actorId: user.id,
-        action: 'LOGIN_FAILURE',
-        entityType: 'User',
-        entityId: user.id,
-      });
+      // Neither write depends on the other's result — running them concurrently instead of
+      // one-after-another cuts this down to a single round trip's worth of latency.
+      await Promise.all([
+        deps.userRepository.recordFailedLogin(userId, { maxAttempts, lockoutMs }),
+        deps.auditLogRepository.record({
+          actorId: user.id,
+          action: 'LOGIN_FAILURE',
+          entityType: 'User',
+          entityId: user.id,
+        }),
+      ]);
       return { ok: false, reason: 'invalid_credential' };
     }
 
-    await deps.userRepository.resetFailedLogins(userId);
-    await deps.auditLogRepository.record({
-      actorId: user.id,
-      action: 'LOGIN_SUCCESS',
-      entityType: 'User',
-      entityId: user.id,
-    });
-
-    const tokens = await issueTokens(user);
+    // Same reasoning: resetting the lockout counter, writing the audit log, and issuing
+    // tokens (which itself writes the new refresh session) are all independent writes.
+    const [, , tokens] = await Promise.all([
+      deps.userRepository.resetFailedLogins(userId),
+      deps.auditLogRepository.record({
+        actorId: user.id,
+        action: 'LOGIN_SUCCESS',
+        entityType: 'User',
+        entityId: user.id,
+      }),
+      issueTokens(user),
+    ]);
     return { ok: true, user: toAuthenticatedUser(user), tokens };
   }
 
@@ -142,15 +149,14 @@ export function createAuthService(
       const payload = verifyRefreshToken(refreshToken);
       if (!payload) return { ok: false, reason: 'invalid' };
 
-      const session = await deps.refreshSessionRepository.findActiveByTokenHash(
-        hashToken(refreshToken),
-      );
-      if (!session) return { ok: false, reason: 'revoked' };
-
-      // Rotate: revoke the used token and issue a brand new pair.
-      await deps.refreshSessionRepository.revoke(session.id);
-
-      const user = await deps.userRepository.findById(payload.sub);
+      // Rotate: revoke the used token and look up the user in parallel — revoking doesn't need
+      // the user record, and the user lookup doesn't need to wait on the revoke, so there's no
+      // reason to do these as two sequential round trips like a separate find-then-revoke would.
+      const [revokedCount, user] = await Promise.all([
+        deps.refreshSessionRepository.revokeActiveByTokenHash(hashToken(refreshToken)),
+        deps.userRepository.findById(payload.sub),
+      ]);
+      if (revokedCount === 0) return { ok: false, reason: 'revoked' };
       if (!user) return { ok: false, reason: 'invalid' };
 
       const tokens = await issueTokens(user);
@@ -160,12 +166,7 @@ export function createAuthService(
     async logout(refreshToken: string): Promise<void> {
       const payload = verifyRefreshToken(refreshToken);
       if (!payload) return;
-      const session = await deps.refreshSessionRepository.findActiveByTokenHash(
-        hashToken(refreshToken),
-      );
-      if (session) {
-        await deps.refreshSessionRepository.revoke(session.id);
-      }
+      await deps.refreshSessionRepository.revokeActiveByTokenHash(hashToken(refreshToken));
     },
 
     async getUser(userId: string): Promise<AuthenticatedUser | null> {

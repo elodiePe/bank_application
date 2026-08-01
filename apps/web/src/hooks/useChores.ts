@@ -29,11 +29,14 @@ export function useMyChores() {
   return useQuery({ queryKey: ['chores', 'mine'], queryFn: fetchMyChores, staleTime: 15_000 });
 }
 
-export function usePendingChoreCompletions() {
+// Parent-only endpoint (`requireRole('PARENT')`) — must be disabled for a child account, or
+// it 403s every time and TanStack Query burns 3 retries on a call that can never succeed.
+export function usePendingChoreCompletions(enabled = true) {
   return useQuery({
     queryKey: ['chores', 'pending'],
     queryFn: fetchPendingChoreCompletions,
     staleTime: 15_000,
+    enabled,
   });
 }
 

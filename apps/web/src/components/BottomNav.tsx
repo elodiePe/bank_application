@@ -42,10 +42,14 @@ export function BottomNav() {
   const { data: user } = useCurrentUser();
   const isParent = user?.role === 'PARENT';
 
-  const pendingRequests = usePendingRequests();
-  const myRequests = useMyRequests();
-  const pendingDisputes = usePendingDisputes();
-  const pendingChoreCompletions = usePendingChoreCompletions();
+  // Each of these four endpoints is restricted to one role — calling the wrong one for the
+  // current account always 403s (and TanStack Query then burns 3 retries on it), so each is
+  // only enabled once we actually know the role (not just while `user` is still loading, when
+  // `isParent` is false by default and would wrongly enable the child-only endpoint).
+  const pendingRequests = usePendingRequests(!!user && isParent);
+  const myRequests = useMyRequests(!!user && !isParent);
+  const pendingDisputes = usePendingDisputes(!!user && isParent);
+  const pendingChoreCompletions = usePendingChoreCompletions(!!user && isParent);
 
   // Every "waiting on you" count (money requests, disputes, and chore validations) shows on
   // Accueil, where they're all actually handled — Maison itself has nothing left to badge.

@@ -6,17 +6,15 @@ export function createRefreshSessionRepository(prisma: PrismaClient) {
       return prisma.refreshSession.create({ data: params });
     },
 
-    findActiveByTokenHash(tokenHash: string) {
-      return prisma.refreshSession.findFirst({
+    /// Combines the find-then-revoke pattern into one round trip — returns how many rows
+    /// were actually revoked (0 means the token was already invalid/expired/revoked), so the
+    /// caller can still tell "was this a real active session" without a separate read first.
+    async revokeActiveByTokenHash(tokenHash: string): Promise<number> {
+      const result = await prisma.refreshSession.updateMany({
         where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
-      });
-    },
-
-    revoke(id: string) {
-      return prisma.refreshSession.update({
-        where: { id },
         data: { revokedAt: new Date() },
       });
+      return result.count;
     },
 
     revokeAllForUser(userId: string) {
