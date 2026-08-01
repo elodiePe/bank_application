@@ -41,6 +41,12 @@ interface PushPayload {
   url?: string;
 }
 
+// `vibrate` is a real, widely-supported NotificationOptions field (Android/desktop Chrome)
+// that TS's lib.dom.d.ts doesn't declare — extend it locally rather than dropping the option.
+interface NotificationOptionsWithVibrate extends NotificationOptions {
+  vibrate?: number[];
+}
+
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
@@ -51,21 +57,20 @@ self.addEventListener('push', (event) => {
     payload = { title: 'Banque Familiale', body: event.data.text() };
   }
 
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      // No leading slash — resolved relative to the SW's own script location, which
-      // already sits at the deployed base path (e.g. /bank_application/ on GitHub
-      // Pages). A leading slash would instead resolve to the domain root and 404.
-      icon: 'icons/icon-192.png',
-      badge: 'icons/icon-192.png',
-      data: { url: payload.url },
-      // Make sure it's actually noticed: buzz the phone, and keep it on screen (Android/
-      // desktop Chrome) instead of auto-dismissing after a few seconds like a silent toast.
-      vibrate: [200, 100, 200],
-      requireInteraction: true,
-    }),
-  );
+  const options: NotificationOptionsWithVibrate = {
+    body: payload.body,
+    // No leading slash — resolved relative to the SW's own script location, which
+    // already sits at the deployed base path (e.g. /bank_application/ on GitHub
+    // Pages). A leading slash would instead resolve to the domain root and 404.
+    icon: 'icons/icon-192.png',
+    badge: 'icons/icon-192.png',
+    data: { url: payload.url },
+    // Make sure it's actually noticed: buzz the phone, and keep it on screen (Android/
+    // desktop Chrome) instead of auto-dismissing after a few seconds like a silent toast.
+    vibrate: [200, 100, 200],
+    requireInteraction: true,
+  };
+  event.waitUntil(self.registration.showNotification(payload.title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {
