@@ -54,6 +54,7 @@ function toAuthenticatedUser(user: User): AuthenticatedUser {
           }
         : null,
     interfaceLevel: user.role === 'CHILD' ? user.interfaceLevel : null,
+    showPointsBalance: user.role === 'CHILD' ? user.showPointsBalance : null,
   };
 }
 

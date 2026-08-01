@@ -4,8 +4,10 @@ import type { MoneyRequestSummary } from '@banque-familiale/shared';
 import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { MONEY_REQUEST_STATUS_LABELS, MONEY_REQUEST_TYPE_LABELS } from '../utils/moneyRequestLabels.js';
 import { useApproveMoneyRequest, useCancelMoneyRequest, useRejectMoneyRequest } from '../hooks/useMoneyRequests.js';
+import { useDismissedIds } from '../hooks/useDismissedIds.js';
 import { statusBackgroundClass } from '../utils/statusColors.js';
 import { TypeBadge } from './TypeBadge.js';
+import { Modal } from './Modal.js';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -22,7 +24,8 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
   const approve = useApproveMoneyRequest();
   const reject = useRejectMoneyRequest();
   const cancel = useCancelMoneyRequest();
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const { dismissed: dismissedIds, dismiss } = useDismissedIds(viewerId, 'money-requests');
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
 
   const visibleRequests = requests.filter((r) => !dismissedIds.has(r.id));
 
@@ -35,6 +38,7 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
   }
 
   return (
+    <>
     <ul className="flex flex-col gap-2">
       {visibleRequests.map((r, index) => {
         const isRequester = r.requesterId === viewerId;
@@ -66,6 +70,19 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
                 {MONEY_REQUEST_STATUS_LABELS[r.status]}
                 {r.respondedByFirstName ? ` (${r.respondedByFirstName})` : ''}
               </p>
+              {r.receiptPhotoDataUrl && (
+                <button
+                  type="button"
+                  onClick={() => setReceiptPreview(r.receiptPhotoDataUrl)}
+                  className="mt-1"
+                >
+                  <img
+                    src={r.receiptPhotoDataUrl}
+                    alt="Ticket de caisse"
+                    className="h-10 w-10 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                  />
+                </button>
+              )}
             </div>
             {(canRespond || canCancel) && (
             <div className="flex shrink-0 gap-2">
@@ -104,7 +121,7 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
             {canDismiss && (
               <button
                 type="button"
-                onClick={() => setDismissedIds((prev) => new Set(prev).add(r.id))}
+                onClick={() => dismiss(r.id)}
                 aria-label="Masquer cette demande"
                 className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-slate-300 hover:bg-slate-100 hover:text-slate-500 dark:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
               >
@@ -122,5 +139,11 @@ export function MoneyRequestList({ requests, viewerId, viewerRole, emptyLabel }:
         );
       })}
     </ul>
+    {receiptPreview && (
+      <Modal open onClose={() => setReceiptPreview(null)} title="Ticket de caisse">
+        <img src={receiptPreview} alt="Ticket de caisse" className="w-full rounded-lg" />
+      </Modal>
+    )}
+    </>
   );
 }

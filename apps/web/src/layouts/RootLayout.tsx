@@ -36,7 +36,7 @@ export function RootLayout() {
 
   return (
     <div className={`min-h-screen ${APP_BACKGROUND} text-slate-900 transition-colors duration-300 dark:text-slate-50`}>
-      <header className="flex items-center justify-between gap-2 border-b border-slate-200/60 px-3 py-3 sm:px-6 sm:py-4 dark:border-slate-700/60">
+      <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-slate-200/60 bg-slate-50/90 px-3 py-3 backdrop-blur-sm sm:px-6 sm:py-4 dark:border-slate-700/60 dark:bg-slate-950/90">
         <Link
           to="/"
           className="truncate text-base font-semibold text-brand-600 sm:text-lg dark:text-brand-400"

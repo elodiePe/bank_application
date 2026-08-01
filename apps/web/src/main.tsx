@@ -4,6 +4,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { App } from './App.js';
 import { ThemeProvider } from './contexts/ThemeContext.js';
+import { ParentModeProvider } from './contexts/ParentModeContext.js';
 import { idbPersister } from './pwa/queryPersister.js';
 import { OfflineBanner } from './pwa/OfflineBanner.js';
 import { UpdatePrompt } from './pwa/UpdatePrompt.js';
@@ -34,9 +35,11 @@ createRoot(document.getElementById('root')!).render(
       }}
     >
       <ThemeProvider>
-        <OfflineBanner />
-        <App />
-        <UpdatePrompt />
+        <ParentModeProvider>
+          <OfflineBanner />
+          <App />
+          <UpdatePrompt />
+        </ParentModeProvider>
       </ThemeProvider>
     </PersistQueryClientProvider>
   </StrictMode>,

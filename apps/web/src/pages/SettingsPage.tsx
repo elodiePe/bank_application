@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useCurrentUser, usePermission } from '../hooks/useAuth.js';
+import { useParentMode } from '../hooks/useParentMode.js';
 import { useParentOverview } from '../hooks/useDashboard.js';
 import { useLogoutFamily } from '../hooks/useFamilyAuth.js';
 import { useTheme } from '../hooks/useTheme.js';
@@ -9,8 +10,10 @@ import { CurrencySettings } from '../components/CurrencySettings.js';
 import { WeeklyAllowanceSettings } from '../components/WeeklyAllowanceSettings.js';
 import { FamilyManagementPanel } from '../components/FamilyManagementPanel.js';
 import { MyAccountSettings } from '../components/MyAccountSettings.js';
+import { PointsVisibilitySetting } from '../components/PointsVisibilitySetting.js';
 import { PushNotificationSettings } from '../components/PushNotificationSettings.js';
 import { DeleteFamilyPanel } from '../components/DeleteFamilyPanel.js';
+import { CustomNotifications } from '../components/CustomNotifications.js';
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -21,6 +24,9 @@ export function SettingsPage() {
   const canManageSettings = usePermission('canManageSettings');
   const canManageFamily = usePermission('canManageFamily');
   const { theme, toggleTheme } = useTheme();
+  const isTeen = user?.interfaceLevel === 'TEEN';
+  const canToggleManagementMode = isParent || isTeen;
+  const { parentModeEnabled, toggleParentMode } = useParentMode();
 
   return (
     <div className="space-y-4">
@@ -38,6 +44,42 @@ export function SettingsPage() {
             {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
           </button>
         </div>
+
+        {canToggleManagementMode && (
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <div>
+              <span className="text-sm font-medium">Mode gestion</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {isParent
+                  ? 'Affiche les outils de gestion (validation, planning, famille…) au lieu d\'une vue simple utilisateur.'
+                  : 'Affiche les outils pour modifier le planning des repas et de la lessive.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleParentMode}
+              aria-pressed={parentModeEnabled}
+              aria-label="Mode gestion"
+              className="flex shrink-0 items-center"
+            >
+              <span
+                className={
+                  parentModeEnabled
+                    ? 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-brand-600 transition-colors dark:bg-brand-500'
+                    : 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-slate-300 transition-colors dark:bg-slate-600'
+                }
+              >
+                <span
+                  className={
+                    parentModeEnabled
+                      ? 'inline-block h-4 w-4 translate-x-4 transform rounded-full bg-white transition-transform'
+                      : 'inline-block h-4 w-4 translate-x-0.5 transform rounded-full bg-white transition-transform'
+                  }
+                />
+              </span>
+            </button>
+          </div>
+        )}
       </CollapsibleSection>
 
       {isParent && canManageSettings && (
@@ -54,8 +96,15 @@ export function SettingsPage() {
         </CollapsibleSection>
       )}
 
+      {isParent && (
+        <CollapsibleSection title="Notifications">
+          <CustomNotifications />
+        </CollapsibleSection>
+      )}
+
       <CollapsibleSection title="Mon compte">
         <MyAccountSettings />
+        {isTeen && <PointsVisibilitySetting />}
         <PushNotificationSettings />
       </CollapsibleSection>
 

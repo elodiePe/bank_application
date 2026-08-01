@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateShoppingListItemInput } from '@banque-familiale/shared';
 import {
+  clearCheckedShoppingListItems,
   createShoppingListItem,
   deleteShoppingListItem,
   fetchShoppingList,
+  notifyShoppingTrip,
   setShoppingListItemChecked,
 } from '../services/shoppingList.service.js';
 
@@ -36,6 +38,18 @@ export function useDeleteShoppingListItem() {
   const invalidate = useInvalidateShoppingList();
   return useMutation({
     mutationFn: (id: string) => deleteShoppingListItem(id),
+    onSuccess: invalidate,
+  });
+}
+
+export function useNotifyShoppingTrip() {
+  return useMutation({ mutationFn: notifyShoppingTrip });
+}
+
+export function useClearCheckedShoppingListItems() {
+  const invalidate = useInvalidateShoppingList();
+  return useMutation({
+    mutationFn: clearCheckedShoppingListItems,
     onSuccess: invalidate,
   });
 }

@@ -14,3 +14,7 @@ export * from './chore.js';
 export * from './mealPlan.js';
 export * from './shoppingList.js';
 export * from './pointsReward.js';
+export * from './laundry.js';
+export * from './customNotification.js';
+export * from './personalTask.js';
+export * from './savingsGoal.js';

@@ -3,8 +3,9 @@ import { z } from 'zod';
 export type ChoreRecurrence = 'ONCE' | 'DAILY' | 'WEEKLY';
 export type ChoreCompletionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 /** MONEY moves real money (a Transaction) on approval; POINTS just adds to a purely
- * cosmetic score kept on the child's account — no conversion, no redemption. */
-export type ChoreRewardType = 'MONEY' | 'POINTS';
+ * cosmetic score kept on the child's account — no conversion, no redemption; NONE is just a
+ * task to mark done, nothing is credited. */
+export type ChoreRewardType = 'MONEY' | 'POINTS' | 'NONE';
 
 export const CHORE_RECURRENCE_LABELS: Record<ChoreRecurrence, string> = {
   ONCE: 'Une seule fois',
@@ -15,6 +16,7 @@ export const CHORE_RECURRENCE_LABELS: Record<ChoreRecurrence, string> = {
 export const CHORE_REWARD_TYPE_LABELS: Record<ChoreRewardType, string> = {
   MONEY: 'Argent',
   POINTS: 'Points',
+  NONE: 'Aucune',
 };
 
 export interface ChoreSummary {
@@ -28,6 +30,8 @@ export interface ChoreSummary {
   /** Non-null only when rewardType is POINTS. */
   rewardPoints: number | null;
   recurrence: ChoreRecurrence;
+  /// When false, the child's "Fait !" applies the reward immediately — no parent validation.
+  requiresApproval: boolean;
   active: boolean;
   /** Status of the completion for the current period (day/week), if any was submitted. */
   currentPeriodStatus: ChoreCompletionStatus | null;
@@ -54,10 +58,11 @@ export const createChoreSchema = z
   .object({
     childUserId: z.string().min(1),
     title: z.string().trim().min(1, 'Le titre est requis').max(80),
-    rewardType: z.enum(['MONEY', 'POINTS']),
+    rewardType: z.enum(['MONEY', 'POINTS', 'NONE']),
     rewardCents: z.number().int().positive('La récompense doit être positive').optional(),
     rewardPoints: z.number().int().positive('La récompense doit être positive').optional(),
     recurrence: z.enum(['ONCE', 'DAILY', 'WEEKLY']),
+    requiresApproval: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.rewardType === 'MONEY' && data.rewardCents === undefined) {
@@ -71,10 +76,11 @@ export type CreateChoreInput = z.infer<typeof createChoreSchema>;
 
 export const updateChoreSchema = z.object({
   title: z.string().trim().min(1).max(80).optional(),
-  rewardType: z.enum(['MONEY', 'POINTS']).optional(),
+  rewardType: z.enum(['MONEY', 'POINTS', 'NONE']).optional(),
   rewardCents: z.number().int().positive().optional(),
   rewardPoints: z.number().int().positive().optional(),
   active: z.boolean().optional(),
+  requiresApproval: z.boolean().optional(),
 });
 export type UpdateChoreInput = z.infer<typeof updateChoreSchema>;
 

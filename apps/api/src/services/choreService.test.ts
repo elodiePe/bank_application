@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedDemoFamily } from '../../prisma/seed.js';
 import { createTestDb, type TestDb } from '../test-utils/testDb.js';
 import { createChoreService, type ChoreService } from './choreService.js';
-import { ConflictError, ForbiddenError, InvalidRequestStateError, ValidationError } from '../utils/errors.js';
+import { ConflictError, ForbiddenError, InvalidRequestStateError, NotFoundError, ValidationError } from '../utils/errors.js';
 
 describe('choreService (seeded demo family)', () => {
   let db: TestDb;
@@ -132,6 +132,119 @@ describe('choreService (seeded demo family)', () => {
     await expect(
       service.approveCompletion({ familyId: 'demo-family', actorId: 'demo-maman', completionId: completion.id }),
     ).rejects.toBeInstanceOf(InvalidRequestStateError);
+  });
+
+  it('a chore with requiresApproval false credits the child immediately, with no PENDING step', async () => {
+    const chore = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-damien',
+      title: 'Nourrir le chat',
+      rewardType: 'MONEY',
+      rewardCents: 30,
+      recurrence: 'DAILY',
+      requiresApproval: false,
+    });
+
+    const before = await db.prisma.childAccount.findUniqueOrThrow({ where: { userId: 'demo-damien' } });
+    const completion = await service.completeChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-damien',
+      choreId: chore.id,
+    });
+    expect(completion.status).toBe('APPROVED');
+
+    const after = await db.prisma.childAccount.findUniqueOrThrow({ where: { userId: 'demo-damien' } });
+    expect(after.balanceCents).toBe(before.balanceCents + 30);
+
+    const pending = await service.listPendingCompletions('demo-family');
+    expect(pending.find((p) => p.id === completion.id)).toBeUndefined();
+  });
+
+  it('deletes a chore, cascading its completions', async () => {
+    const chore = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-damien',
+      title: 'Chore à supprimer',
+      rewardType: 'MONEY',
+      rewardCents: 20,
+      recurrence: 'ONCE',
+    });
+    await service.completeChore({ familyId: 'demo-family', childUserId: 'demo-damien', choreId: chore.id });
+
+    await service.deleteChore({ familyId: 'demo-family', choreId: chore.id });
+
+    const stillThere = await db.prisma.chore.findUnique({ where: { id: chore.id } });
+    expect(stillThere).toBeNull();
+    const completions = await db.prisma.choreCompletion.findMany({ where: { choreId: chore.id } });
+    expect(completions).toHaveLength(0);
+  });
+
+  it('postponing a chore deactivates it and creates a clone that starts tomorrow, invisible in the meantime', async () => {
+    const chore = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-damien',
+      title: 'Ranger la chambre',
+      rewardType: 'POINTS',
+      rewardPoints: 5,
+      recurrence: 'ONCE',
+    });
+
+    const clone = await service.postponeChore({
+      familyId: 'demo-family',
+      choreId: chore.id,
+      actorId: 'demo-damien',
+      actorRole: 'CHILD',
+    });
+
+    const original = await db.prisma.chore.findUniqueOrThrow({ where: { id: chore.id } });
+    expect(original.active).toBe(false);
+
+    expect(clone.title).toBe('Ranger la chambre');
+    const mine = await service.listMyChores('demo-damien');
+    expect(mine.find((c) => c.id === clone.id)).toBeUndefined();
+
+    const cloneRow = await db.prisma.chore.findUniqueOrThrow({ where: { id: clone.id } });
+    expect(cloneRow.startsOn).not.toBeNull();
+    expect(cloneRow.startsOn!.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('refuses to postpone a DAILY chore, and refuses a child postponing a sibling\'s chore', async () => {
+    const dailyChore = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-damien',
+      title: 'Faire son lit',
+      rewardType: 'NONE',
+      recurrence: 'DAILY',
+    });
+    await expect(
+      service.postponeChore({ familyId: 'demo-family', choreId: dailyChore.id, actorId: 'demo-damien', actorRole: 'CHILD' }),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    const onceChore = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-damien',
+      title: 'Tâche de Damien',
+      rewardType: 'NONE',
+      recurrence: 'ONCE',
+    });
+    await expect(
+      service.postponeChore({ familyId: 'demo-family', choreId: onceChore.id, actorId: 'demo-matthieu', actorRole: 'CHILD' }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('refuses to delete a chore belonging to a different family', async () => {
+    const chore = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-damien',
+      title: 'Chore protégé',
+      rewardType: 'MONEY',
+      rewardCents: 20,
+      recurrence: 'ONCE',
+    });
+
+    await expect(service.deleteChore({ familyId: 'not-a-real-family', choreId: chore.id })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('rejecting a completion never moves money', async () => {

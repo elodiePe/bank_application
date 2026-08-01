@@ -1,11 +1,14 @@
 import type {
+  MealPlanChoreConfigSummary,
   MealPlanDayConfig,
   MealPlanDaySummary,
   MealPlanRotationOrderSummary,
+  SetMealPlanChoreConfigInput,
   SetMealPlanDayInput,
+  SetMealPlanOccurrenceStatusInput,
   SetMealPlanRotationOrderInput,
 } from '@banque-familiale/shared';
-import { apiGet, apiPut } from './api.js';
+import { apiGet, apiPatch, apiPut } from './api.js';
 
 export function fetchMealPlanConfig(): Promise<MealPlanDayConfig[]> {
   return apiGet<MealPlanDayConfig[]>('/meal-plan');
@@ -25,4 +28,16 @@ export function setMealPlanRotationOrder(input: SetMealPlanRotationOrderInput): 
 
 export function setMealPlanDay(input: SetMealPlanDayInput): Promise<MealPlanDayConfig> {
   return apiPut<MealPlanDayConfig>('/meal-plan/day', input);
+}
+
+export function fetchMealPlanChoreConfig(): Promise<MealPlanChoreConfigSummary> {
+  return apiGet<MealPlanChoreConfigSummary>('/meal-plan/chore-config');
+}
+
+export function setMealPlanChoreConfig(input: SetMealPlanChoreConfigInput): Promise<MealPlanChoreConfigSummary> {
+  return apiPut<MealPlanChoreConfigSummary>('/meal-plan/chore-config', input);
+}
+
+export function setMealPlanOccurrenceStatus(input: SetMealPlanOccurrenceStatusInput): Promise<void> {
+  return apiPatch<void>('/meal-plan/occurrence-status', input);
 }

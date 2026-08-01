@@ -123,8 +123,29 @@ export function StockPortfolioView() {
                     <span className="text-sm font-normal text-slate-500 dark:text-slate-400">{h.companyName}</span>
                   </p>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {h.quantity} titre{h.quantity > 1 ? 's' : ''} ·{' '}
-                    {h.marketValueCents !== null ? formatMoney(h.marketValueCents, STOCK_CURRENCY) : '—'}
+                    {/* Mobile: total value + gain/loss (no share count — the row is too tight
+                        for three numbers). Desktop: share count + total value, gain/loss moves
+                        to its own column on the right instead. */}
+                    <span className="sm:hidden">
+                      {h.marketValueCents !== null ? formatMoney(h.marketValueCents, STOCK_CURRENCY) : '—'}
+                      {h.gainLossCents !== null && (
+                        <span
+                          className={
+                            h.gainLossCents >= 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-red-600 dark:text-red-400'
+                          }
+                        >
+                          {' · '}
+                          {h.gainLossCents >= 0 ? '+' : ''}
+                          {formatMoney(h.gainLossCents, STOCK_CURRENCY)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="hidden sm:inline">
+                      {h.quantity} titre{h.quantity > 1 ? 's' : ''} ·{' '}
+                      {h.marketValueCents !== null ? formatMoney(h.marketValueCents, STOCK_CURRENCY) : '—'}
+                    </span>
                   </p>
                   {/* <p className="text-xs text-slate-400 dark:text-slate-500">
                     {new Date(h.firstPurchaseAt).toLocaleDateString('fr-CH')}
@@ -133,7 +154,7 @@ export function StockPortfolioView() {
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {h.gainLossCents !== null && (
                     <span
-                      className={`text-sm font-semibold ${
+                      className={`hidden text-sm font-semibold sm:inline ${
                         h.gainLossCents >= 0
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : 'text-red-600 dark:text-red-400'

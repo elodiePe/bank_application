@@ -16,3 +16,11 @@ export function setShoppingListItemChecked(id: string, isChecked: boolean): Prom
 export function deleteShoppingListItem(id: string): Promise<void> {
   return apiDelete<void>(`/shopping-list/${id}`);
 }
+
+export function notifyShoppingTrip(): Promise<void> {
+  return apiPost<void>('/shopping-list/notify-trip', {});
+}
+
+export function clearCheckedShoppingListItems(): Promise<void> {
+  return apiDelete<void>('/shopping-list/checked');
+}

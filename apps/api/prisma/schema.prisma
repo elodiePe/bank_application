@@ -57,6 +57,7 @@ enum ChoreCompletionStatus {
 enum ChoreRewardType {
   MONEY
   POINTS
+  NONE
 }
 
 enum StockOrderType {
@@ -118,12 +119,20 @@ enum NotificationType {
   CHORE_REJECTED
   CHORE_REMINDER
   MEAL_PLAN_TURN
+  LAUNDRY_TURN
   GENERIC
 }
 
 enum MealPlanDayMode {
   FIXED
   ROTATING
+}
+
+/// When a LaundryType is due — see LaundryType.scheduleType for the meaning of each value.
+enum LaundryScheduleType {
+  ONCE
+  WEEKLY
+  MULTIPLE
 }
 
 /// A family is its own isolated tenant: its own owner login, members, accounts and
@@ -166,6 +175,9 @@ model User {
   /// Children only — which dashboard variant to show them, set by a parent. Defaults to
   /// MIDDLE (today's unchanged dashboard) so existing accounts render exactly as before.
   interfaceLevel ChildInterfaceLevel @default(MIDDLE)
+  /// Children only — self-service preference (TEEN can toggle it in Paramètres; MIDDLE/YOUNG
+  /// keep the default) for whether their own points count is shown on their dashboard.
+  showPointsBalance Boolean @default(true)
 
   /// Brute-force protection — a 4-digit PIN only has 10 000 combinations.
   failedLoginAttempts Int       @default(0)
@@ -206,10 +218,13 @@ model User {
   stockOrdersResponded      StockOrder[]       @relation("StockOrderResponder")
   choresAssigned            Chore[]            @relation("ChoreChild")
   choreCompletionsResponded ChoreCompletion[]  @relation("ChoreCompletionResponder")
-  mealPlanFixedDays         MealPlanSlot[]             @relation("MealPlanFixedAssignee")
   mealCookNotifications     MealCookNotificationLog[]  @relation("MealCookNotified")
   shoppingListItemsAdded    ShoppingListItem[]         @relation("ShoppingListAddedBy")
   shoppingListItemsChecked  ShoppingListItem[]         @relation("ShoppingListCheckedBy")
+  laundryNotifications      LaundryNotificationLog[]   @relation("LaundryNotified")
+  customNotificationsMade   CustomNotification[]       @relation("CustomNotificationCreatedBy")
+  personalTasks             PersonalTask[]             @relation("PersonalTaskOwner")
+  savingsGoal               SavingsGoal?               @relation("SavingsGoalOwner")
 
   @@index([familyId])
   /// Covers the login-picker query (active members of a family), run on every family
@@ -315,6 +330,10 @@ model MoneyRequest {
 
   amountCents Int
   comment     String?
+  /// Optional receipt photo attached by a MIDDLE/TEEN child when requesting money — resized
+  /// client-side to a JPEG data URL, same inline-storage pattern as SavingsGoal.photoDataUrl
+  /// (no file-storage service in this app).
+  receiptPhotoDataUrl String? @db.Text
 
   respondedById String?
   respondedBy   User?     @relation("MoneyRequestResponder", fields: [respondedById], references: [id], onDelete: Cascade)
@@ -350,6 +369,10 @@ model Chore {
   rewardPoints Int?
   recurrence   ChoreRecurrence
 
+  /// When false, completeChore applies the reward and marks APPROVED immediately — no PENDING
+  /// state, no parent action needed. Parent-configurable per chore at creation.
+  requiresApproval Boolean @default(true)
+
   /// Soft toggle, never hard-deleted — consistent with deactivatedAt elsewhere. Also set to
   /// false automatically once a ONCE chore's completion is approved (nothing left to do).
   active Boolean @default(true)
@@ -358,6 +381,17 @@ model Chore {
   /// current period, so the hourly reminder check never nags twice for the same period.
   lastReminderSentAt DateTime?
 
+  /// Set when a separate evening CHORE_REMINDER pass (distinct cadence from the hourly
+  /// threshold-based one above) was last sent, so that pass never nags twice in the same
+  /// evening. Independent of lastReminderSentAt so the two passes don't suppress each other.
+  lastEveningReminderSentAt DateTime?
+
+  /// Null means "active immediately", same as every chore before this field existed. Set to a
+  /// future midnight-UTC date when a chore is created via "reporter à demain" — the chore is
+  /// excluded from lists/reminders until that date arrives, at which point it behaves exactly
+  /// like any other chore.
+  startsOn DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -365,6 +399,61 @@ model Chore {
 
   @@index([familyId])
   @@index([childUserId])
+}
+
+/// A lightweight personal to-do — created by any family member (parent or child) for
+/// themselves, no reward, no approval step: just a title and a done/not-done flag, toggled by
+/// the owner. Deliberately its own model rather than a Chore, since Chore.childUserId, the
+/// reward fields, and the approval workflow all assume a parent rewarding a child — none of
+/// that applies here.
+model PersonalTask {
+  id String @id @default(cuid())
+
+  familyId String
+  userId   String
+  user     User   @relation("PersonalTaskOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  title String
+
+  /// When true, the task is a standing daily habit — `done` reflects only today (backed by
+  /// `lastDoneDate`, reset automatically each new day). When false, it's a one-off task for a
+  /// specific `date`, and `done` is a simple persistent flag.
+  recurring Boolean @default(false)
+  /// Set only when NOT recurring — the single day this task is for.
+  date DateTime?
+  /// Set only when recurring — the last calendar day this was marked done, so "done" can be
+  /// computed as "was it marked today" without a separate completions table.
+  lastDoneDate DateTime?
+  /// Set only when NOT recurring.
+  done Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([familyId])
+  @@index([userId])
+}
+
+/// A child's savings goal — "what am I saving up for", shown against their current balance so
+/// they can see how much is still missing. One goal per child at a time (setting a new one
+/// replaces the old); the photo is stored inline as a data URL rather than in a separate file
+/// store, since this app has no other file-storage integration and the image is small
+/// (resized client-side before upload).
+model SavingsGoal {
+  id String @id @default(cuid())
+
+  familyId String
+  userId   String @unique
+  user     User   @relation("SavingsGoalOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  targetCents Int
+  photoDataUrl String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([familyId])
 }
 
 /// One row per time a child marks a chore done. Unlike AllowanceHistory/InterestHistory
@@ -436,9 +525,8 @@ model MealPlanSlot {
 
   mode MealPlanDayMode @default(FIXED)
 
-  /// Set when mode is FIXED, null when ROTATING.
-  fixedUserId String?
-  fixedUser   User?   @relation("MealPlanFixedAssignee", fields: [fixedUserId], references: [id], onDelete: Cascade)
+  /// Populated when mode is FIXED, empty when ROTATING. One or more people doing it together.
+  fixedUserIds String[] @default([])
 
   updatedAt DateTime @updatedAt
 
@@ -448,11 +536,48 @@ model MealPlanSlot {
 
 /// The one shared rotation order used by every ROTATING weekday in a family — one row per
 /// family. Deliberately not per-weekday: "the rotation order is always the same" regardless
-/// of which day is rotating, so the parent only ever configures it once.
+/// of which day is rotating, so the parent only ever configures it once. Stored as JSON since
+/// Prisma/Postgres arrays can't be nested: an ordered array of turns, each turn itself an array
+/// of one or more userIds doing it together (e.g. [["u1"], ["u2","u3"], ["u1"]]).
 model MealPlanRotationOrder {
-  familyId        String   @id
-  orderedUserIds  String[] @default([])
-  updatedAt       DateTime @updatedAt
+  familyId      String   @id
+  orderedGroups Json     @default("[]")
+  updatedAt     DateTime @updatedAt
+}
+
+/// Family-wide opt-in: when `enabled`, the daily cook is also given a real Chore for the day
+/// (only when they're a CHILD — chores are a kid-reward mechanism, parents never get one),
+/// using this reward/approval config. One row per family, created lazily on first enable.
+model MealPlanChoreConfig {
+  familyId String @id
+
+  enabled          Boolean         @default(false)
+  requiresApproval Boolean         @default(true)
+  rewardType       ChoreRewardType @default(POINTS)
+  rewardCents      Int?
+  rewardPoints     Int?
+
+  updatedAt DateTime @updatedAt
+}
+
+/// Personal tracking for one calendar date's cooking turn — whoever's assigned can mark it done
+/// for themselves, or push it to another date if they didn't have time (`postponedToDate`).
+/// Purely a display overlay on top of the calendar-driven rotation: it never changes who's
+/// actually up next, it only changes what today's occurrence *shows*. One row per family per
+/// date since MealPlanSlot only ever has one cook per day.
+model MealPlanOccurrenceStatus {
+  id String @id @default(cuid())
+
+  familyId String
+  date     DateTime
+
+  done            Boolean   @default(false)
+  postponedToDate DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([familyId, date])
+  @@index([familyId])
 }
 
 /// Dedupe log for the "it's your turn to cook" pushes — one row per family, per calendar date,
@@ -474,6 +599,135 @@ model MealCookNotificationLog {
 
   @@unique([familyId, date, kind])
   @@index([familyId])
+}
+
+/// One user-named laundry type per row (e.g. "Blancs", "Couleurs", "Draps") — families define
+/// as many or as few as they like, unlike MealPlanSlot's fixed 7 weekdays. FIXED always
+/// resolves to `fixedUserId`. ROTATING draws from this type's own `rotationOrder`, advanced
+/// automatically by calendar week (same weekIndexFor math as meal plan) — no manual "done"
+/// action, since `scheduleType`/`weekdays`/`onceDate` already say exactly when each occurrence
+/// falls, the same way MealPlanSlot's weekday drives its own rotation.
+model LaundryType {
+  id String @id @default(cuid())
+
+  familyId String
+  name     String
+  order    Int    @default(0)
+
+  mode MealPlanDayMode @default(FIXED)
+
+  /// Populated when mode is FIXED, empty when ROTATING. One or more people doing it together.
+  fixedUserIds String[] @default([])
+
+  /// An ordered array of turns, each turn itself an array of one or more userIds doing it
+  /// together — same JSON shape as MealPlanRotationOrder.orderedGroups, but scoped to this
+  /// type instead of shared family-wide.
+  rotationGroups Json @default("[]")
+
+  /// When this type is due. ONCE: a single specific calendar date (`onceDate`), never repeats.
+  /// WEEKLY: one weekday (`weekdays` has exactly one entry, e.g. [2] for every Wednesday).
+  /// MULTIPLE: several weekdays, all recurring every week (e.g. [0, 3] for every Monday and
+  /// Thursday). Drives both the rotation math and the day-before/day-of notification job, the
+  /// same way MealPlanSlot's weekday does.
+  scheduleType LaundryScheduleType @default(WEEKLY)
+  weekdays     Int[]               @default([])
+  onceDate     DateTime?
+
+  /// Opt-in: when true, whoever's due also gets a real Chore for the day (only when they're a
+  /// CHILD — chores are a kid-reward mechanism, parents never get one).
+  generatesChore        Boolean          @default(false)
+  choreRequiresApproval Boolean          @default(true)
+  choreRewardType       ChoreRewardType?
+  choreRewardCents      Int?
+  choreRewardPoints     Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([familyId])
+}
+
+/// Same overlay as MealPlanOccurrenceStatus, but per (laundryTypeId, date) since several types
+/// can be due the same day.
+model LaundryOccurrenceStatus {
+  id String @id @default(cuid())
+
+  familyId      String
+  laundryTypeId String
+  date          DateTime
+
+  done            Boolean   @default(false)
+  postponedToDate DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([laundryTypeId, date])
+  @@index([familyId])
+}
+
+/// Dedupe log for "it's your turn to do this laundry" pushes — one row per laundry type, per
+/// calendar date, per kind (TODAY / ADVANCE the evening before). Scoped per laundry type
+/// (unlike MealCookNotificationLog, which is per family) since several types can legitimately
+/// be due on the same date, each needing its own independent notification.
+model LaundryNotificationLog {
+  id String @id @default(cuid())
+
+  familyId      String
+  laundryTypeId String
+  date          DateTime
+  kind          String   @default("TODAY")
+
+  userId String
+  user   User   @relation("LaundryNotified", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([laundryTypeId, date, kind])
+  @@index([familyId])
+}
+
+/// A parent-authored reminder — free-text title/body, sent on `date` (ONCE) or every week on
+/// `date`'s weekday (`recurring`). `sendToAll` broadcasts to every family member; otherwise
+/// only `recipientUserIds` (a chosen subset, meant for specific children) gets it.
+model CustomNotification {
+  id String @id @default(cuid())
+
+  familyId String
+  title    String
+  body     String
+
+  date      DateTime
+  recurring Boolean  @default(false)
+  /// HH:mm (24h), compared against the current UTC time-of-day when the notification fires —
+  /// same UTC-everywhere convention as the rest of the app's date/time handling.
+  time      String   @default("08:00")
+
+  sendToAll        Boolean  @default(true)
+  recipientUserIds String[] @default([])
+
+  createdById String
+  createdBy   User   @relation("CustomNotificationCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  logs CustomNotificationLog[]
+
+  createdAt DateTime @default(now())
+
+  @@index([familyId])
+}
+
+/// Dedupe log — one row per CustomNotification per calendar date it's actually been sent for,
+/// so the hourly check never repeats itself (same convention as MealCookNotificationLog).
+model CustomNotificationLog {
+  id String @id @default(cuid())
+
+  customNotificationId String
+  customNotification   CustomNotification @relation(fields: [customNotificationId], references: [id], onDelete: Cascade)
+
+  date DateTime
+
+  createdAt DateTime @default(now())
+
+  @@unique([customNotificationId, date])
 }
 
 /// A shared family shopping list — any member can add or check off an item. familyId is a

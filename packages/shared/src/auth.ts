@@ -86,6 +86,9 @@ export interface AuthenticatedUser {
   permissions: ParentPermissions | null;
   /** Non-null for CHILD, null for PARENT — which dashboard variant to render. */
   interfaceLevel: ChildInterfaceLevel | null;
+  /** Non-null for CHILD, null for PARENT — whether this child's own points count is shown
+   * on their dashboard. Only a TEEN-interface child can change it (see setPointsVisibilitySchema). */
+  showPointsBalance: boolean | null;
 }
 
 /// Which child dashboard variant to render — chosen directly by a parent (not derived

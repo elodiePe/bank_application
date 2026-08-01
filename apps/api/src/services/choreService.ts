@@ -40,6 +40,7 @@ function toChoreSummary(chore: ChoreWithChild, currentCompletion: ChoreCompletio
     rewardCents: chore.rewardCents,
     rewardPoints: chore.rewardPoints,
     recurrence: chore.recurrence,
+    requiresApproval: chore.requiresApproval,
     active: chore.active,
     currentPeriodStatus: currentCompletion?.status ?? null,
     createdAt: chore.createdAt.toISOString(),
@@ -74,7 +75,7 @@ export function createChoreService(prisma: PrismaClient) {
 
   async function assertChoreInFamily(choreId: string, familyId: string) {
     const chore = await choreRepo.findByIdOrThrow(choreId);
-    if (chore.familyId !== familyId) throw new NotFoundError('Corvée introuvable');
+    if (chore.familyId !== familyId) throw new NotFoundError('Tâche introuvable');
     return chore;
   }
 
@@ -92,8 +93,8 @@ export function createChoreService(prisma: PrismaClient) {
     },
 
     async listMyChores(childUserId: string): Promise<ChoreSummary[]> {
-      const chores = await choreRepo.listActiveForChild(childUserId);
       const now = new Date();
+      const chores = await choreRepo.listActiveForChild(childUserId, now);
       return Promise.all(
         chores.map(async (chore) => {
           const period = periodStartFor(chore, now);
@@ -107,10 +108,11 @@ export function createChoreService(prisma: PrismaClient) {
       familyId: string;
       childUserId: string;
       title: string;
-      rewardType: 'MONEY' | 'POINTS';
+      rewardType: 'MONEY' | 'POINTS' | 'NONE';
       rewardCents?: number;
       rewardPoints?: number;
       recurrence: 'ONCE' | 'DAILY' | 'WEEKLY';
+      requiresApproval?: boolean;
     }): Promise<ChoreSummary> {
       const target = await userRepo.findById(params.childUserId);
       if (
@@ -130,6 +132,7 @@ export function createChoreService(prisma: PrismaClient) {
         rewardCents: params.rewardType === 'MONEY' ? params.rewardCents : null,
         rewardPoints: params.rewardType === 'POINTS' ? params.rewardPoints : null,
         recurrence: params.recurrence,
+        requiresApproval: params.requiresApproval ?? true,
       });
       return toChoreSummary(chore, null);
     },
@@ -138,10 +141,11 @@ export function createChoreService(prisma: PrismaClient) {
       familyId: string;
       choreId: string;
       title?: string;
-      rewardType?: 'MONEY' | 'POINTS';
+      rewardType?: 'MONEY' | 'POINTS' | 'NONE';
       rewardCents?: number;
       rewardPoints?: number;
       active?: boolean;
+      requiresApproval?: boolean;
     }): Promise<ChoreSummary> {
       const chore = await assertChoreInFamily(params.choreId, params.familyId);
       const rewardType = params.rewardType ?? chore.rewardType;
@@ -153,20 +157,62 @@ export function createChoreService(prisma: PrismaClient) {
         rewardCents: params.rewardType ? (rewardType === 'MONEY' ? (params.rewardCents ?? chore.rewardCents) : null) : params.rewardCents,
         rewardPoints: params.rewardType ? (rewardType === 'POINTS' ? (params.rewardPoints ?? chore.rewardPoints) : null) : params.rewardPoints,
         active: params.active,
+        requiresApproval: params.requiresApproval,
       });
       const now = new Date();
       const completion = await completionRepo.findLatestForPeriod(updated.id, periodStartFor(updated, now));
       return toChoreSummary(updated, completion);
     },
 
+    async deleteChore(params: { familyId: string; choreId: string }): Promise<void> {
+      await assertChoreInFamily(params.choreId, params.familyId);
+      await choreRepo.delete(params.choreId);
+    },
+
+    /** "Reporter à demain": deactivates today's still-undone chore (no reward, nothing
+     * recorded) and creates a fresh clone that only becomes visible/reminded once tomorrow
+     * arrives. DAILY chores already reset every day on their own, so postponing one wouldn't
+     * mean anything. Callable by the chore's own child, or any parent on the child's behalf. */
+    async postponeChore(params: {
+      familyId: string;
+      choreId: string;
+      actorId: string;
+      actorRole: 'PARENT' | 'CHILD';
+    }): Promise<ChoreSummary> {
+      const chore = await assertChoreInFamily(params.choreId, params.familyId);
+      if (params.actorRole === 'CHILD' && chore.childUserId !== params.actorId) {
+        throw new ForbiddenError("Cette tâche n'est pas la tienne");
+      }
+      if (chore.recurrence === 'DAILY') {
+        throw new ValidationError('Une tâche quotidienne revient déjà toute seule, inutile de la reporter');
+      }
+
+      const now = new Date();
+      const tomorrow = new Date(getStartOfDay(now).getTime() + 24 * 60 * 60 * 1000);
+
+      await choreRepo.update(chore.id, { active: false });
+      const clone = await choreRepo.create({
+        familyId: chore.familyId,
+        childUser: { connect: { id: chore.childUserId } },
+        title: chore.title,
+        rewardType: chore.rewardType,
+        rewardCents: chore.rewardCents,
+        rewardPoints: chore.rewardPoints,
+        recurrence: chore.recurrence,
+        requiresApproval: chore.requiresApproval,
+        startsOn: tomorrow,
+      });
+      return toChoreSummary(clone, null);
+    },
+
     /** A child marks one of their own active chores as done for the current period. */
     async completeChore(params: { familyId: string; childUserId: string; choreId: string }): Promise<ChoreCompletionSummary> {
       const chore = await assertChoreInFamily(params.choreId, params.familyId);
       if (chore.childUserId !== params.childUserId) {
-        throw new ForbiddenError("Cette corvée n'est pas la tienne");
+        throw new ForbiddenError("Cette tâche n'est pas la tienne");
       }
       if (!chore.active) {
-        throw new ValidationError("Cette corvée n'est plus active");
+        throw new ValidationError("Cette tâche n'est plus active");
       }
 
       const now = new Date();
@@ -174,6 +220,46 @@ export function createChoreService(prisma: PrismaClient) {
       const existing = await completionRepo.findActiveForPeriod(chore.id, period);
       if (existing) {
         throw new ConflictError('Déjà envoyé pour cette période');
+      }
+
+      // Chores set up without approval reward themselves the moment the child taps "Fait !" —
+      // no PENDING state, no parent action, same reward-application logic as approveCompletion.
+      if (!chore.requiresApproval) {
+        const account = await childAccountRepo.findByUserId(chore.childUserId);
+        if (!account) throw new NotFoundError('Compte introuvable');
+
+        let transactionId: string | undefined;
+        if (chore.rewardType === 'MONEY') {
+          const transaction = await moneyService.deposit({
+            accountId: account.id,
+            familyId: params.familyId,
+            amountCents: chore.rewardCents!,
+            comment: `Tâche : ${chore.title}`,
+            validatedById: params.childUserId,
+            type: 'CHORE_REWARD',
+          });
+          transactionId = transaction.id;
+        } else if (chore.rewardType === 'POINTS') {
+          await childAccountRepo.incrementPoints(account.id, chore.rewardPoints!);
+        }
+
+        const created = await completionRepo.create({
+          chore: { connect: { id: chore.id } },
+          periodStart: period,
+          status: 'APPROVED',
+          rewardType: chore.rewardType,
+          rewardCents: chore.rewardCents,
+          rewardPoints: chore.rewardPoints,
+          respondedBy: { connect: { id: params.childUserId } },
+          respondedAt: now,
+          ...(transactionId ? { transactionId } : {}),
+        });
+
+        if (chore.recurrence === 'ONCE') {
+          await choreRepo.update(chore.id, { active: false });
+        }
+
+        return toCompletionSummary(created);
       }
 
       const created = await completionRepo.create({
@@ -206,7 +292,7 @@ export function createChoreService(prisma: PrismaClient) {
       completionId: string;
     }): Promise<ChoreCompletionSummary> {
       const completion = await completionRepo.findByIdOrThrow(params.completionId);
-      if (completion.chore.familyId !== params.familyId) throw new NotFoundError('Corvée introuvable');
+      if (completion.chore.familyId !== params.familyId) throw new NotFoundError('Tâche introuvable');
       if (completion.status !== 'PENDING') throw new InvalidRequestStateError();
 
       const account = await childAccountRepo.findByUserId(completion.chore.childUserId);
@@ -218,12 +304,12 @@ export function createChoreService(prisma: PrismaClient) {
           accountId: account.id,
           familyId: params.familyId,
           amountCents: completion.rewardCents!,
-          comment: `Corvée : ${completion.chore.title}`,
+          comment: `Tâche : ${completion.chore.title}`,
           validatedById: params.actorId,
           type: 'CHORE_REWARD',
         });
         transactionId = transaction.id;
-      } else {
+      } else if (completion.rewardType === 'POINTS') {
         // Points never touch the money ledger — just a cosmetic score on the account.
         await childAccountRepo.incrementPoints(account.id, completion.rewardPoints!);
       }
@@ -258,7 +344,7 @@ export function createChoreService(prisma: PrismaClient) {
       completionId: string;
     }): Promise<ChoreCompletionSummary> {
       const completion = await completionRepo.findByIdOrThrow(params.completionId);
-      if (completion.chore.familyId !== params.familyId) throw new NotFoundError('Corvée introuvable');
+      if (completion.chore.familyId !== params.familyId) throw new NotFoundError('Tâche introuvable');
       if (completion.status !== 'PENDING') throw new InvalidRequestStateError();
 
       const updated = await completionRepo.updateStatus(completion.id, {
@@ -282,7 +368,7 @@ export function createChoreService(prisma: PrismaClient) {
      * how many of each reminder were sent, for the caller to log. */
     async processReminders(now: Date = new Date()): Promise<{ choreReminders: number; approvalReminders: number }> {
       let choreReminders = 0;
-      const activeChores = await choreRepo.listAllActive();
+      const activeChores = await choreRepo.listAllActive(now);
       for (const chore of activeChores) {
         const period = periodStartFor(chore, now);
         if (chore.lastReminderSentAt && chore.lastReminderSentAt >= period) continue;
@@ -320,6 +406,38 @@ export function createChoreService(prisma: PrismaClient) {
       }
 
       return { choreReminders, approvalReminders };
+    },
+
+    /** Distinct evening catch-up (gated to 18:00+ UTC, same convention as the meal-plan/laundry
+     * evening notices), separate from the hourly threshold-based reminder above: once a day,
+     * nudges about any still-undone WEEKLY/ONCE chore, mentioning it can be postponed to
+     * tomorrow. DAILY chores are skipped — they already reset every day on their own. */
+    async processEveningReminders(now: Date = new Date()): Promise<number> {
+      if (now.getUTCHours() < 18) return 0;
+
+      const today = getStartOfDay(now);
+      let sent = 0;
+      const activeChores = await choreRepo.listAllActive(now);
+      for (const chore of activeChores) {
+        if (chore.recurrence === 'DAILY') continue;
+        if (chore.lastEveningReminderSentAt && getStartOfDay(chore.lastEveningReminderSentAt).getTime() === today.getTime()) {
+          continue;
+        }
+
+        const period = periodStartFor(chore, now);
+        const existing = await completionRepo.findActiveForPeriod(chore.id, period);
+        if (existing) continue;
+
+        await notificationService.notifyChoreEveningReminder({
+          childUserId: chore.childUserId,
+          choreTitle: chore.title,
+          choreId: chore.id,
+        });
+        await choreRepo.markEveningReminderSent(chore.id, now);
+        sent += 1;
+      }
+
+      return sent;
     },
   };
 }

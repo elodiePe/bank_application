@@ -47,10 +47,13 @@ export function BottomNav() {
   const pendingDisputes = usePendingDisputes();
   const pendingChoreCompletions = usePendingChoreCompletions();
 
+  // Every "waiting on you" count (money requests, disputes, and chore validations) shows on
+  // Accueil, where they're all actually handled — Maison itself has nothing left to badge.
   const homeBadge = isParent
-    ? (pendingRequests.data?.length ?? 0) + (pendingDisputes.data?.length ?? 0)
+    ? (pendingRequests.data?.length ?? 0) +
+      (pendingDisputes.data?.length ?? 0) +
+      (pendingChoreCompletions.data?.length ?? 0)
     : (myRequests.data?.filter((r) => r.status === 'PENDING' && r.targetUserId === user?.id).length ?? 0);
-  const choresBadge = isParent ? (pendingChoreCompletions.data?.length ?? 0) : 0;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden dark:border-slate-700 dark:bg-slate-800">
@@ -73,7 +76,7 @@ export function BottomNav() {
       <NavLink to="/chores" className={({ isActive }) => `${LINK_CLASS} ${isActive ? ACTIVE_LINK_CLASS : ''}`}>
         {({ isActive }) => (
           <>
-            <NavIcon icon="🏠" isActive={isActive} badgeCount={choresBadge} />
+            <NavIcon icon="🏠" isActive={isActive} badgeCount={0} />
             Maison
           </>
         )}

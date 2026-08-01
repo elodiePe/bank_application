@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import {
+  useClearCheckedShoppingListItems,
   useCreateShoppingListItem,
   useDeleteShoppingListItem,
+  useNotifyShoppingTrip,
   useSetShoppingListItemChecked,
   useShoppingList,
 } from '../hooks/useShoppingList.js';
@@ -12,7 +14,10 @@ export function ShoppingList() {
   const createItem = useCreateShoppingListItem();
   const setChecked = useSetShoppingListItemChecked();
   const deleteItem = useDeleteShoppingListItem();
+  const notifyTrip = useNotifyShoppingTrip();
+  const clearChecked = useClearCheckedShoppingListItems();
   const [label, setLabel] = useState('');
+  const [tripSent, setTripSent] = useState(false);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -20,9 +25,39 @@ export function ShoppingList() {
     createItem.mutate({ label }, { onSuccess: () => setLabel('') });
   }
 
+  function onNotifyTrip() {
+    notifyTrip.mutate(undefined, {
+      onSuccess: () => {
+        setTripSent(true);
+        setTimeout(() => setTripSent(false), 4000);
+      },
+    });
+  }
+
+  const checkedCount = items.data?.filter((item) => item.isChecked).length ?? 0;
+
   return (
     <section>
       <h2 className="mb-3 text-lg font-semibold">Liste de courses</h2>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onNotifyTrip}
+          disabled={notifyTrip.isPending}
+          className="flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+        >
+          🛒 {tripSent ? 'Prévenu !' : 'Je vais faire les courses'}
+        </button>
+        <button
+          type="button"
+          onClick={() => clearChecked.mutate()}
+          disabled={clearChecked.isPending || checkedCount === 0}
+          className="flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+        >
+          ✅ Courses finies
+        </button>
+      </div>
 
       <form onSubmit={onSubmit} className="mb-4 flex gap-2">
         <input

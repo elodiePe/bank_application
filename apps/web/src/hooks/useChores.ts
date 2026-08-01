@@ -4,9 +4,11 @@ import {
   approveChoreCompletion,
   completeChore,
   createChore,
+  deleteChore,
   fetchFamilyChores,
   fetchMyChores,
   fetchPendingChoreCompletions,
+  postponeChore,
   rejectChoreCompletion,
   updateChore,
 } from '../services/chore.service.js';
@@ -51,10 +53,26 @@ export function useUpdateChore() {
   });
 }
 
+export function useDeleteChore() {
+  const invalidate = useInvalidateChoresAndDashboard();
+  return useMutation({
+    mutationFn: (choreId: string) => deleteChore(choreId),
+    onSuccess: invalidate,
+  });
+}
+
 export function useCompleteChore() {
   const invalidate = useInvalidateChoresAndDashboard();
   return useMutation({
     mutationFn: (choreId: string) => completeChore(choreId),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePostponeChore() {
+  const invalidate = useInvalidateChoresAndDashboard();
+  return useMutation({
+    mutationFn: (choreId: string) => postponeChore(choreId),
     onSuccess: invalidate,
   });
 }

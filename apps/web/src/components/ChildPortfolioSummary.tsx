@@ -45,19 +45,21 @@ export function ChildPortfolioSummary({ child, canOffer = true }: ChildPortfolio
             <button
               type="button"
               onClick={() => setBuyOpen(true)}
-              aria-label="Acheter une action"
-              title="Acheter"
+              aria-label="Acheter une action (débite le compte)"
+              title="Acheter (débite le compte)"
               className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/70"
             >
               +
             </button>
-            {/* <button
+            <button
               type="button"
               onClick={() => setGiftOpen(true)}
-              className="rounded-lg bg-brand-100 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-200 dark:bg-brand-900/40 dark:text-brand-400 dark:hover:bg-brand-900/70"
+              aria-label="Offrir des actions (sans débiter le compte)"
+              title="Offrir (sans débiter le compte)"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-brand-700 hover:bg-brand-200 dark:bg-brand-900/40 dark:text-brand-400 dark:hover:bg-brand-900/70"
             >
-              Offrir
-            </button> */}
+              🎁
+            </button>
           </div>
         )}
       </div>

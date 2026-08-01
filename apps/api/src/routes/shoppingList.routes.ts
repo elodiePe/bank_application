@@ -16,6 +16,8 @@ export function createShoppingListRouter(prisma: PrismaClient) {
   // remove an item.
   router.get('/', asyncHandler((req, res) => controller.list(req, res)));
   router.post('/', asyncHandler((req, res) => controller.create(req, res)));
+  router.post('/notify-trip', asyncHandler((req, res) => controller.notifyTrip(req, res)));
+  router.delete('/checked', asyncHandler((req, res) => controller.clearChecked(req, res)));
   router.patch('/:id/checked', asyncHandler((req, res) => controller.setChecked(req, res)));
   router.delete('/:id', asyncHandler((req, res) => controller.remove(req, res)));
 

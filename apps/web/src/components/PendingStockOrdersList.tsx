@@ -19,9 +19,9 @@ export function PendingStockOrdersList({ canAct = true }: { canAct?: boolean }) 
         {pending.data.map((o) => (
           <li
             key={o.id}
-            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+            className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-800"
           >
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="font-medium">
                 {o.childFirstName} veut {o.type === 'BUY' ? 'acheter' : 'vendre'} {o.quantity} {o.symbol}
               </p>
@@ -36,7 +36,7 @@ export function PendingStockOrdersList({ canAct = true }: { canAct?: boolean }) 
                   type="button"
                   onClick={() => approve.mutate(o.id)}
                   disabled={approve.isPending || reject.isPending}
-                  className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/70"
+                  className="flex-1 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 sm:flex-none dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/70"
                 >
                   Accepter
                 </button>
@@ -44,7 +44,7 @@ export function PendingStockOrdersList({ canAct = true }: { canAct?: boolean }) 
                   type="button"
                   onClick={() => reject.mutate(o.id)}
                   disabled={approve.isPending || reject.isPending}
-                  className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 disabled:opacity-60 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/70"
+                  className="flex-1 rounded-full bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200 disabled:opacity-60 sm:flex-none dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/70"
                 >
                   Refuser
                 </button>

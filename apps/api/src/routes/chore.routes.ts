@@ -25,6 +25,12 @@ export function createChoreRouter(prisma: PrismaClient) {
     requireRole('CHILD'),
     asyncHandler((req, res) => controller.complete(req, res)),
   );
+  // Open to both roles: the service itself checks that a CHILD actor owns the chore, while any
+  // PARENT may postpone on a child's behalf.
+  router.post(
+    '/:id/postpone',
+    asyncHandler((req, res) => controller.postpone(req, res)),
+  );
 
   const parentRouter = Router();
   parentRouter.use(requireRole('PARENT'));
@@ -39,6 +45,11 @@ export function createChoreRouter(prisma: PrismaClient) {
     '/:id',
     requirePermission('canManageMoney'),
     asyncHandler((req, res) => controller.update(req, res)),
+  );
+  parentRouter.delete(
+    '/:id',
+    requirePermission('canManageMoney'),
+    asyncHandler((req, res) => controller.remove(req, res)),
   );
   parentRouter.post(
     '/completions/:completionId/approve',

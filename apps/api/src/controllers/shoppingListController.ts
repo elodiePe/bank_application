@@ -39,6 +39,16 @@ export function createShoppingListController(shoppingListService: ShoppingListSe
       await shoppingListService.delete({ familyId: req.auth!.familyId, itemId: String(req.params.id) });
       res.status(204).send();
     },
+
+    async clearChecked(req: Request, res: Response) {
+      await shoppingListService.clearChecked({ familyId: req.auth!.familyId });
+      res.status(204).send();
+    },
+
+    async notifyTrip(req: Request, res: Response) {
+      await shoppingListService.notifyGoingShopping({ familyId: req.auth!.familyId, requesterId: req.auth!.sub });
+      res.status(204).send();
+    },
   };
 }
 

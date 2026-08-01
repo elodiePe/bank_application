@@ -1,0 +1,1 @@
+ALTER TYPE "ChoreRewardType" ADD VALUE 'NONE';

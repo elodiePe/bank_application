@@ -7,6 +7,7 @@ import type {
   ResetPinInput,
   SetChildInterfaceLevelInput,
   SetEmailInput,
+  SetPointsVisibilityInput,
   UpdatePermissionsInput,
 } from '@banque-familiale/shared';
 import {
@@ -14,12 +15,14 @@ import {
   changeOwnPin,
   confirmMemberPinReset,
   deactivateMember,
+  fetchHouseholdRoster,
   fetchMembers,
   requestMemberPinReset,
   requestPinResetNotification,
   resetMemberPin,
   setChildInterfaceLevel,
   setOwnEmail,
+  setShowPointsBalance,
   updateMemberPermissions,
 } from '../services/member.service.js';
 import { useInvalidateCurrentUser } from './useAuth.js';
@@ -28,6 +31,12 @@ const MEMBERS_QUERY_KEY = ['members'] as const;
 
 export function useMembers(enabled = true) {
   return useQuery({ queryKey: MEMBERS_QUERY_KEY, queryFn: fetchMembers, enabled });
+}
+
+/** Trimmed-down roster (no email/permissions) for the meal-plan/laundry member pickers —
+ * reachable by a parent or a TEEN-interface child, unlike `useMembers` which is parent-only. */
+export function useHouseholdRoster(enabled = true) {
+  return useQuery({ queryKey: ['members', 'roster'], queryFn: fetchHouseholdRoster, enabled });
 }
 
 function useInvalidateMembers() {
@@ -49,6 +58,14 @@ export function useSetOwnEmail() {
 
 export function useChangeOwnPin() {
   return useMutation({ mutationFn: (input: ChangePinInput) => changeOwnPin(input) });
+}
+
+export function useSetShowPointsBalance() {
+  const invalidateCurrentUser = useInvalidateCurrentUser();
+  return useMutation({
+    mutationFn: (input: SetPointsVisibilityInput) => setShowPointsBalance(input),
+    onSuccess: () => invalidateCurrentUser(),
+  });
 }
 
 export function useAddMember() {

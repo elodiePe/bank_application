@@ -24,6 +24,7 @@ function toSummary(r: RequestWithRelations): MoneyRequestSummary {
     status: r.status,
     amountCents: r.amountCents,
     comment: r.comment,
+    receiptPhotoDataUrl: r.receiptPhotoDataUrl,
     createdAt: r.createdAt.toISOString(),
     respondedByFirstName: r.respondedBy?.firstName ?? null,
     respondedAt: r.respondedAt?.toISOString() ?? null,
@@ -43,7 +44,17 @@ export function createMoneyRequestService(prisma: PrismaClient) {
       amountCents: number;
       comment?: string;
       targetUserId?: string;
+      receiptPhotoDataUrl?: string;
     }): Promise<MoneyRequestSummary> {
+      // A receipt photo is only offered to MIDDLE/TEEN children in the UI — enforced here too,
+      // rather than trusting the client, since a YOUNG child's requester still has no such flow.
+      if (params.receiptPhotoDataUrl) {
+        const requester = await userRepo.findById(params.requesterId);
+        if (!requester || requester.role !== 'CHILD' || requester.interfaceLevel === 'YOUNG') {
+          throw new ValidationError('La photo de ticket n\'est pas disponible pour ce profil');
+        }
+      }
+
       let targetUserId: string | undefined;
       if (params.type === 'TRANSFER_REQUEST') {
         if (!params.targetUserId) {
@@ -71,6 +82,7 @@ export function createMoneyRequestService(prisma: PrismaClient) {
         status: 'PENDING',
         amountCents: params.amountCents,
         comment: params.comment ?? null,
+        receiptPhotoDataUrl: params.receiptPhotoDataUrl ?? null,
         ...(targetUserId ? { targetUser: { connect: { id: targetUserId } } } : {}),
       });
 

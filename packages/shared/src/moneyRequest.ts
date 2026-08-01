@@ -14,6 +14,9 @@ export interface MoneyRequestSummary {
   status: MoneyRequestStatus;
   amountCents: number;
   comment: string | null;
+  /** Optional receipt photo attached by a MIDDLE/TEEN child (a JPEG data URL) — null when
+   * absent or when the requester's interface level doesn't offer this. */
+  receiptPhotoDataUrl: string | null;
   createdAt: string;
   respondedByFirstName: string | null;
   respondedAt: string | null;
@@ -25,6 +28,9 @@ export const createMoneyRequestSchema = z
     amountCents: z.number().int().positive('Le montant doit être positif'),
     comment: z.string().trim().max(280).optional(),
     targetUserId: z.string().min(1).optional(),
+    // Same size cap as SavingsGoal.photoDataUrl — a resized (max 800px, quality 0.8) JPEG
+    // data URL comfortably fits well under this.
+    receiptPhotoDataUrl: z.string().max(1_400_000).regex(/^data:image\//).optional(),
   })
   .refine((data) => (data.type === 'TRANSFER_REQUEST' ? !!data.targetUserId : true), {
     message: 'Choisissez un frère ou une sœur',

@@ -107,6 +107,24 @@ export function createMemberService(prisma: PrismaClient) {
       return members.map(toDetail);
     },
 
+    /** A trimmed-down roster for the meal-plan/laundry member pickers — just who exists and
+     * whether they're active, never email or the parent-permission booleans. Reachable by a
+     * TEEN-interface child (via requireParentOrTeen) as well as a parent, unlike the full
+     * `listMembers`, so it must never carry anything a child shouldn't see about a parent. */
+    async listHouseholdRoster(familyId: string): Promise<FamilyMemberDetail[]> {
+      const members = await userRepo.listFamilyMembers(familyId);
+      return members.map((m) => ({
+        id: m.id,
+        firstName: m.firstName,
+        role: m.role,
+        email: null,
+        hasPinLogin: m.pinHash !== null,
+        isActive: true,
+        permissions: null,
+        interfaceLevel: null,
+      }));
+    },
+
     /// One-time only: once a parent has an email on file, it can't be changed — it's the
     /// address used to confirm account deletion and other sensitive actions, so letting it
     /// be swapped out would undermine that.
@@ -135,6 +153,15 @@ export function createMemberService(prisma: PrismaClient) {
         const { subject, html } = pinChangedTemplate({ firstName: user.firstName });
         void sendEmail({ to: user.email, subject, html });
       }
+    },
+
+    /// Self-service — only a TEEN-interface child can change their own points-display
+    /// preference (YOUNG/MIDDLE keep the always-on default, matching the "interface avancée"
+    /// scope already used for the Mode gestion toggle).
+    async setShowPointsBalance(userId: string, show: boolean) {
+      const user = await userRepo.findById(userId);
+      if (!user || user.role !== 'CHILD' || user.interfaceLevel !== 'TEEN') throw new ForbiddenError();
+      await userRepo.setShowPointsBalance(userId, show);
     },
 
     async addFamilyMember(params: {

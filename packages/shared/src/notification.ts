@@ -21,6 +21,7 @@ export type NotificationType =
   | 'CHORE_REJECTED'
   | 'CHORE_REMINDER'
   | 'MEAL_PLAN_TURN'
+  | 'LAUNDRY_TURN'
   | 'GENERIC';
 
 export interface NotificationSummary {

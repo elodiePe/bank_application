@@ -318,9 +318,9 @@ function ChoresStep({
 
   return (
     <StepShell>
-      <h1 className="text-xl font-bold">Des corvées pour {childFirstName} ?</h1>
+      <h1 className="text-xl font-bold">Des tâches pour {childFirstName} ?</h1>
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Optionnel — coche ce qui s'applique, chaque corvée cochée est ajoutée en quotidien avec une
+        Optionnel — coche ce qui s'applique, chaque tâche cochée est ajoutée en quotidien avec une
         récompense suggérée. Modifiable à tout moment depuis les Paramètres.
       </p>
       <div className="flex flex-wrap gap-2">

@@ -15,27 +15,37 @@ import { CorrectionModal } from '../components/CorrectionModal.js';
 import { PendingStockOrdersList } from '../components/PendingStockOrdersList.js';
 import { StockPortfolioView } from '../components/StockPortfolioView.js';
 import { DisputeModal } from '../components/DisputeModal.js';
+import { SavingsGoalCard } from '../components/SavingsGoalCard.js';
 
 type MoneyAction = { mode: 'DEPOSIT' | 'WITHDRAWAL'; child: ChildBalanceSummary };
-type MoneySubTab = 'money' | 'stocks';
-const SUB_TAB_ORDER: MoneySubTab[] = ['money', 'stocks'];
-const SUB_TAB_LABELS: Record<MoneySubTab, string> = { money: 'Argent', stocks: 'Actions' };
+type MoneySubTab = 'money' | 'stocks' | 'savings';
+const SUB_TAB_LABELS: Record<MoneySubTab, string> = { money: 'Argent', stocks: 'Actions', savings: 'Épargne' };
 
-/** Sub-tab lives in the URL (?tab=stocks) so RootLayout can tint the page background to match,
- * and so the choice survives a reload. */
-function useMoneySubTab(): [MoneySubTab, (tab: MoneySubTab) => void] {
+/** Sub-tab lives in the URL (?tab=stocks) so the choice survives a reload. `tabOrder` differs
+ * by page — a child gets a third "Épargne" tab a parent doesn't — so an out-of-range value
+ * (e.g. a stale link to a tab this viewer doesn't have) just falls back to the first tab. */
+function useMoneySubTab(tabOrder: MoneySubTab[]): [MoneySubTab, (tab: MoneySubTab) => void] {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab: MoneySubTab = searchParams.get('tab') === 'stocks' ? 'stocks' : 'money';
+  const requested = searchParams.get('tab') as MoneySubTab | null;
+  const tab: MoneySubTab = requested && tabOrder.includes(requested) ? requested : tabOrder[0]!;
   const setTab = (next: MoneySubTab) => {
-    setSearchParams(next === 'stocks' ? { tab: 'stocks' } : {}, { replace: true });
+    setSearchParams(next === tabOrder[0] ? {} : { tab: next }, { replace: true });
   };
   return [tab, setTab];
 }
 
-function SubTabs({ active, onChange }: { active: MoneySubTab; onChange: (tab: MoneySubTab) => void }) {
+function SubTabs({
+  active,
+  onChange,
+  tabOrder,
+}: {
+  active: MoneySubTab;
+  onChange: (tab: MoneySubTab) => void;
+  tabOrder: MoneySubTab[];
+}) {
   return (
     <div className="mb-6 flex gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
-      {SUB_TAB_ORDER.map((tab) => (
+      {tabOrder.map((tab) => (
         <button
           key={tab}
           type="button"
@@ -68,35 +78,41 @@ function startSwipeUnlessInteractive(dragControls: ReturnType<typeof useDragCont
   };
 }
 
-/** Renders both sub-tab panels side by side and slides between them — swipe left/right, or
- * use the SubTabs buttons. Both panels stay mounted so the drag never has to wait on data. */
+/** Renders every sub-tab panel side by side and slides between them — swipe left/right, or
+ * use the SubTabs buttons. All panels stay mounted so the drag never has to wait on data. */
 function SwipeableSubTabs({
   tab,
   onChange,
-  money,
-  stocks,
+  tabOrder,
+  panels,
 }: {
   tab: MoneySubTab;
   onChange: (tab: MoneySubTab) => void;
-  money: ReactNode;
-  stocks: ReactNode;
+  tabOrder: MoneySubTab[];
+  panels: Partial<Record<MoneySubTab, ReactNode>>;
 }) {
-  const index = SUB_TAB_ORDER.indexOf(tab);
+  const index = tabOrder.indexOf(tab);
+  const count = tabOrder.length;
   const dragControls = useDragControls();
 
   const handleDragEnd = (_: unknown, info: PanInfo) => {
-    if (info.offset.x < -SWIPE_THRESHOLD && tab === 'money') {
-      onChange('stocks');
-    } else if (info.offset.x > SWIPE_THRESHOLD && tab === 'stocks') {
-      onChange('money');
+    if (info.offset.x < -SWIPE_THRESHOLD && index < count - 1) {
+      onChange(tabOrder[index + 1]!);
+    } else if (info.offset.x > SWIPE_THRESHOLD && index > 0) {
+      onChange(tabOrder[index - 1]!);
     }
   };
 
   return (
-    <div className="overflow-hidden" onPointerDown={startSwipeUnlessInteractive(dragControls)}>
+    <div
+      className="overflow-hidden"
+      style={{ touchAction: 'pan-y' }}
+      onPointerDown={startSwipeUnlessInteractive(dragControls)}
+    >
       <motion.div
-        className="flex w-[200%]"
-        animate={{ x: `-${index * 50}%` }}
+        className="flex"
+        style={{ width: `${count * 100}%` }}
+        animate={{ x: `-${index * (100 / count)}%` }}
         transition={{ type: 'tween', duration: 0.25 }}
         drag="x"
         dragListener={false}
@@ -105,14 +121,21 @@ function SwipeableSubTabs({
         dragElastic={0.12}
         onDragEnd={handleDragEnd}
       >
-        <div className="w-1/2 shrink-0 pr-2">{money}</div>
-        <div className="w-1/2 shrink-0 pl-2">{stocks}</div>
+        {tabOrder.map((t) => (
+          <div key={t} className="shrink-0 px-2" style={{ width: `${100 / count}%` }}>
+            {panels[t]}
+          </div>
+        ))}
       </motion.div>
     </div>
   );
 }
 
 const RECENT_TRANSACTIONS_LIMIT = 5;
+const PARENT_TAB_ORDER: MoneySubTab[] = ['money', 'stocks'];
+// A child also gets an "Épargne" tab for their savings goal — a parent doesn't have one of
+// their own to show here.
+const CHILD_TAB_ORDER: MoneySubTab[] = ['money', 'stocks', 'savings'];
 
 /** "Argent" section: everything financial — balance, transaction history, and stock
  * trading — for both roles. The recent-transactions list is capped at 5 for everyone. */
@@ -130,7 +153,7 @@ function ParentMoneyPage() {
   const canManageMoney = usePermission('canManageMoney');
   const canManageActions = usePermission('canManageActions');
 
-  const [tab, setTab] = useMoneySubTab();
+  const [tab, setTab] = useMoneySubTab(PARENT_TAB_ORDER);
   const [moneyAction, setMoneyAction] = useState<MoneyAction | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [correctionTarget, setCorrectionTarget] = useState<TransactionSummary | null>(null);
@@ -222,9 +245,14 @@ function ParentMoneyPage() {
 
   return (
     <div className="space-y-6">
-      <SubTabs active={tab} onChange={setTab} />
+      <SubTabs active={tab} onChange={setTab} tabOrder={PARENT_TAB_ORDER} />
 
-      <SwipeableSubTabs tab={tab} onChange={setTab} money={moneyPanel} stocks={stocksPanel} />
+      <SwipeableSubTabs
+        tab={tab}
+        onChange={setTab}
+        tabOrder={PARENT_TAB_ORDER}
+        panels={{ money: moneyPanel, stocks: stocksPanel }}
+      />
 
       {moneyAction && (
         <MoneyActionModal
@@ -245,10 +273,11 @@ function ParentMoneyPage() {
 }
 
 function ChildMoneyPage() {
+  const { data: user } = useCurrentUser();
   const overview = useChildOverview();
   const transactions = useMyTransactions(RECENT_TRANSACTIONS_LIMIT);
   const { currency, rate } = useFxRate();
-  const [tab, setTab] = useMoneySubTab();
+  const [tab, setTab] = useMoneySubTab(CHILD_TAB_ORDER);
   const [disputeTarget, setDisputeTarget] = useState<TransactionSummary | null>(null);
 
   const balance = formatMoney(convertCents(overview.data?.balanceCents ?? 0, rate), currency);
@@ -263,9 +292,9 @@ function ChildMoneyPage() {
             Argent de poche : {formatMoney(overview.data.weeklyAllowanceCents, STORAGE_CURRENCY)} / semaine
           </p>
         )}
-        {/* {overview.data && overview.data.pointsBalance > 0 && (
+        {overview.data && overview.data.pointsBalance > 0 && user?.showPointsBalance !== false && (
           <p className="mt-1 text-sm text-brand-100">⭐ {overview.data.pointsBalance} points</p>
-        )} */}
+        )}
       </div>
 
       <section>
@@ -302,11 +331,22 @@ function ChildMoneyPage() {
     </div>
   );
 
+  const savingsPanel = (
+    <div className="space-y-6">
+      <SavingsGoalCard balanceCents={overview.data?.balanceCents ?? 0} />
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      <SubTabs active={tab} onChange={setTab} />
+      <SubTabs active={tab} onChange={setTab} tabOrder={CHILD_TAB_ORDER} />
 
-      <SwipeableSubTabs tab={tab} onChange={setTab} money={moneyPanel} stocks={stocksPanel} />
+      <SwipeableSubTabs
+        tab={tab}
+        onChange={setTab}
+        tabOrder={CHILD_TAB_ORDER}
+        panels={{ money: moneyPanel, stocks: stocksPanel, savings: savingsPanel }}
+      />
 
       {disputeTarget && <DisputeModal transaction={disputeTarget} onClose={() => setDisputeTarget(null)} />}
     </div>

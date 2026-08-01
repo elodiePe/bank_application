@@ -84,6 +84,16 @@ export function LogoutIcon() {
   );
 }
 
+export function KebabIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden>
+      <circle cx="10" cy="4" r="1.6" />
+      <circle cx="10" cy="10" r="1.6" />
+      <circle cx="10" cy="16" r="1.6" />
+    </svg>
+  );
+}
+
 export function SlidersIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden>

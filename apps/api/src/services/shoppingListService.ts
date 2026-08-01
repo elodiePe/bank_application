@@ -1,6 +1,7 @@
 import type { PrismaClient, ShoppingListItem, User } from '@prisma/client';
 import type { ShoppingListItemSummary } from '@banque-familiale/shared';
 import { createShoppingListRepository } from '../repositories/shoppingListRepository.js';
+import { createNotificationService } from './notificationService.js';
 import { NotFoundError } from '../utils/errors.js';
 
 type ItemWithUsers = ShoppingListItem & { addedBy: User; checkedBy: User | null };
@@ -18,6 +19,7 @@ function toSummary(item: ItemWithUsers): ShoppingListItemSummary {
 
 export function createShoppingListService(prisma: PrismaClient) {
   const repo = createShoppingListRepository(prisma);
+  const notificationService = createNotificationService(prisma);
 
   async function assertInFamily(id: string, familyId: string) {
     const item = await repo.findByIdOrThrow(id);
@@ -54,6 +56,16 @@ export function createShoppingListService(prisma: PrismaClient) {
     async delete(params: { familyId: string; itemId: string }): Promise<void> {
       await assertInFamily(params.itemId, params.familyId);
       await repo.delete(params.itemId);
+    },
+
+    /** Bulk-clears everything already checked off — the "course finie" action, once whoever
+     * went shopping is back and has ticked off what they bought. */
+    async clearChecked(params: { familyId: string }): Promise<void> {
+      await repo.deleteAllChecked(params.familyId);
+    },
+
+    async notifyGoingShopping(params: { familyId: string; requesterId: string }): Promise<void> {
+      await notificationService.notifyShoppingTrip(params);
     },
   };
 }

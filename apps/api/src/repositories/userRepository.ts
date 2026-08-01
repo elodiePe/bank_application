@@ -76,6 +76,10 @@ export function createUserRepository(prisma: PrismaClient) {
       return prisma.user.update({ where: { id: userId }, data: { interfaceLevel } });
     },
 
+    setShowPointsBalance(userId: string, show: boolean) {
+      return prisma.user.update({ where: { id: userId }, data: { showPointsBalance: show } });
+    },
+
     deactivate(userId: string) {
       return prisma.user.update({ where: { id: userId }, data: { deactivatedAt: new Date() } });
     },

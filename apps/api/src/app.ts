@@ -21,6 +21,10 @@ import { createChoreRouter } from './routes/chore.routes.js';
 import { createMealPlanRouter } from './routes/mealPlan.routes.js';
 import { createShoppingListRouter } from './routes/shoppingList.routes.js';
 import { createPointsRewardRouter } from './routes/pointsReward.routes.js';
+import { createLaundryRouter } from './routes/laundry.routes.js';
+import { createCustomNotificationRouter } from './routes/customNotification.routes.js';
+import { createPersonalTaskRouter } from './routes/personalTask.routes.js';
+import { createSavingsGoalRouter } from './routes/savingsGoal.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -35,7 +39,9 @@ export function createApp() {
 
   app.use(helmet());
   app.use(cors({ origin: env.webOrigin, credentials: true }));
-  app.use(express.json());
+  // Default 100kb is too small for the savings-goal photo (a resized JPEG as a base64 data
+  // URL, ~33% larger than its binary size) — bumped just enough to fit that, not open-ended.
+  app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser());
 
   app.use('/health', healthRouter);
@@ -55,6 +61,10 @@ export function createApp() {
   app.use('/meal-plan', createMealPlanRouter(prisma));
   app.use('/shopping-list', createShoppingListRouter(prisma));
   app.use('/points-rewards', createPointsRewardRouter(prisma));
+  app.use('/laundry', createLaundryRouter(prisma));
+  app.use('/custom-notifications', createCustomNotificationRouter(prisma));
+  app.use('/personal-tasks', createPersonalTaskRouter(prisma));
+  app.use('/savings-goal', createSavingsGoalRouter(prisma));
 
   app.use(errorHandler);
 

@@ -38,6 +38,11 @@ export const resetPinSchema = z.object({
 });
 export type ResetPinInput = z.infer<typeof resetPinSchema>;
 
+export const setPointsVisibilitySchema = z.object({
+  show: z.boolean(),
+});
+export type SetPointsVisibilityInput = z.infer<typeof setPointsVisibilitySchema>;
+
 export const confirmMemberPinResetSchema = z.object({
   token: z.string().min(1),
   newPin: pinSchema,

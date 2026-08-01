@@ -12,6 +12,7 @@ const ROUTE = {
   argent: '/dashboard',
   actions: '/dashboard?tab=stocks',
   maison: '/chores',
+  courses: '/chores?tab=shopping',
   parametres: '/settings',
 } as const;
 
@@ -364,7 +365,7 @@ export function createNotificationService(prisma: PrismaClient) {
         parents.map((p) => ({
           userId: p.id,
           type: 'CHORE_COMPLETED',
-          title: `${params.childFirstName} a fait une corvée`,
+          title: `${params.childFirstName} a fait une tâche`,
           body: `${params.childFirstName} dit avoir fini « ${params.choreTitle} ».`,
           relatedChoreCompletionId: params.choreCompletionId,
         })),
@@ -375,20 +376,22 @@ export function createNotificationService(prisma: PrismaClient) {
     async notifyChoreApproved(params: {
       childUserId: string;
       choreTitle: string;
-      rewardType: 'MONEY' | 'POINTS';
+      rewardType: 'MONEY' | 'POINTS' | 'NONE';
       rewardCents: number | null;
       rewardPoints: number | null;
       approvedByFirstName: string;
       choreCompletionId: string;
     }) {
-      const reward =
-        params.rewardType === 'MONEY' ? formatChf(params.rewardCents ?? 0) : `${params.rewardPoints ?? 0} points`;
+      const body =
+        params.rewardType === 'NONE'
+          ? `${params.approvedByFirstName} a validé « ${params.choreTitle} ».`
+          : `${params.approvedByFirstName} a validé « ${params.choreTitle} » — tu as gagné ${params.rewardType === 'MONEY' ? formatChf(params.rewardCents ?? 0) : `${params.rewardPoints ?? 0} points`}.`;
       await createAndPush(
         {
           userId: params.childUserId,
           type: 'CHORE_APPROVED',
-          title: 'Corvée validée !',
-          body: `${params.approvedByFirstName} a validé « ${params.choreTitle} » — tu as gagné ${reward}.`,
+          title: 'Tâche validée !',
+          body,
           relatedChoreCompletionId: params.choreCompletionId,
         },
         ROUTE.accueil,
@@ -405,7 +408,7 @@ export function createNotificationService(prisma: PrismaClient) {
         {
           userId: params.childUserId,
           type: 'CHORE_REJECTED',
-          title: 'Corvée refusée',
+          title: 'Tâche refusée',
           body: `${params.rejectedByFirstName} n'a pas validé « ${params.choreTitle} ». Tu peux réessayer.`,
           relatedChoreCompletionId: params.choreCompletionId,
         },
@@ -418,8 +421,23 @@ export function createNotificationService(prisma: PrismaClient) {
         {
           userId: params.childUserId,
           type: 'CHORE_REMINDER',
-          title: 'Corvée à faire',
+          title: 'Tâche à faire',
           body: `N'oublie pas : « ${params.choreTitle} » n'est pas encore fait.`,
+          relatedChoreId: params.choreId,
+        },
+        ROUTE.maison,
+      );
+    },
+
+    /** Distinct evening pass (not the hourly threshold-based one above) — mentions that the
+     * chore can be postponed to tomorrow instead of just repeating "not done yet". */
+    async notifyChoreEveningReminder(params: { childUserId: string; choreTitle: string; choreId: string }) {
+      await createAndPush(
+        {
+          userId: params.childUserId,
+          type: 'CHORE_REMINDER',
+          title: 'Tâche pas encore faite',
+          body: `« ${params.choreTitle} » n'est pas encore fait — tu peux la faire maintenant ou la reporter à demain.`,
           relatedChoreId: params.choreId,
         },
         ROUTE.maison,
@@ -440,7 +458,7 @@ export function createNotificationService(prisma: PrismaClient) {
         parents.map((p) => ({
           userId: p.id,
           type: 'CHORE_REMINDER',
-          title: 'Corvée en attente de validation',
+          title: 'Tâche en attente de validation',
           body: `« ${params.choreTitle} » de ${params.childFirstName} attend toujours ta validation.`,
           relatedChoreCompletionId: params.choreCompletionId,
         })),
@@ -471,6 +489,61 @@ export function createNotificationService(prisma: PrismaClient) {
           body: "Pense à prévoir le repas du soir de demain, c'est ton tour.",
         },
         ROUTE.maison,
+      );
+    },
+
+    async notifyLaundryTurn(params: { userId: string; laundryTypeName: string }) {
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'LAUNDRY_TURN',
+          title: "C'est ton tour pour la lessive !",
+          body: `N'oublie pas : « ${params.laundryTypeName} » est à faire aujourd'hui.`,
+        },
+        ROUTE.maison,
+      );
+    },
+
+    /** Advance notice, sent the evening before — same LAUNDRY_TURN type as the same-day
+     * reminder, since both point at the same laundry screen. */
+    async notifyLaundryTurnTomorrow(params: { userId: string; laundryTypeName: string }) {
+      await createAndPush(
+        {
+          userId: params.userId,
+          type: 'LAUNDRY_TURN',
+          title: 'Demain, à toi la lessive !',
+          body: `Pense à « ${params.laundryTypeName} », c'est ton tour demain.`,
+        },
+        ROUTE.maison,
+      );
+    },
+
+    /** A parent-authored reminder (see customNotificationService) — arbitrary title/body, so
+     * it's stored as GENERIC rather than getting its own type. */
+    async notifyCustom(params: { userId: string; title: string; body: string }) {
+      await createAndPush(
+        { userId: params.userId, type: 'GENERIC', title: params.title, body: params.body },
+        ROUTE.accueil,
+      );
+    },
+
+    /** Broadcast to everyone else in the family — no dedicated type, just GENERIC — announcing
+     * that the requester is about to go shopping, so it's the last chance to add something to
+     * the list. */
+    async notifyShoppingTrip(params: { familyId: string; requesterId: string }) {
+      const members = await userRepo.listFamilyMembers(params.familyId);
+      const requester = members.find((m) => m.id === params.requesterId);
+      const others = members.filter((m) => m.id !== params.requesterId);
+      if (!requester || others.length === 0) return;
+
+      await createManyAndPush(
+        others.map((m) => ({
+          userId: m.id,
+          type: 'GENERIC',
+          title: `${requester.firstName} va faire les courses`,
+          body: "C'est maintenant ou jamais pour ajouter quelque chose à la liste !",
+        })),
+        ROUTE.courses,
       );
     },
 

@@ -60,6 +60,10 @@ self.addEventListener('push', (event) => {
       icon: 'icons/icon-192.png',
       badge: 'icons/icon-192.png',
       data: { url: payload.url },
+      // Make sure it's actually noticed: buzz the phone, and keep it on screen (Android/
+      // desktop Chrome) instead of auto-dismissing after a few seconds like a silent toast.
+      vibrate: [200, 100, 200],
+      requireInteraction: true,
     }),
   );
 });

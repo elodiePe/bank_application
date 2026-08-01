@@ -1,5 +1,10 @@
 import type { Request, Response } from 'express';
-import { setMealPlanDaySchema, setMealPlanRotationOrderSchema } from '@banque-familiale/shared';
+import {
+  setMealPlanChoreConfigSchema,
+  setMealPlanDaySchema,
+  setMealPlanOccurrenceStatusSchema,
+  setMealPlanRotationOrderSchema,
+} from '@banque-familiale/shared';
 import type { MealPlanService } from '../services/mealPlanService.js';
 import { ValidationError } from '../utils/errors.js';
 
@@ -27,7 +32,7 @@ export function createMealPlanController(mealPlanService: MealPlanService) {
 
       const order = await mealPlanService.setRotationOrder({
         familyId: req.auth!.familyId,
-        orderedUserIds: parsed.data.orderedUserIds,
+        orderedGroups: parsed.data.orderedGroups,
       });
       res.json(order);
     },
@@ -40,8 +45,29 @@ export function createMealPlanController(mealPlanService: MealPlanService) {
         familyId: req.auth!.familyId,
         weekday: parsed.data.weekday,
         mode: parsed.data.mode,
-        fixedUserId: parsed.data.fixedUserId,
+        fixedUserIds: parsed.data.fixedUserIds,
       });
+      res.json(config);
+    },
+
+    async setOccurrenceStatus(req: Request, res: Response) {
+      const parsed = setMealPlanOccurrenceStatusSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+      await mealPlanService.setOccurrenceStatus({ familyId: req.auth!.familyId, ...parsed.data });
+      res.status(204).end();
+    },
+
+    async getChoreConfig(req: Request, res: Response) {
+      const config = await mealPlanService.getChoreConfig(req.auth!.familyId);
+      res.json(config);
+    },
+
+    async setChoreConfig(req: Request, res: Response) {
+      const parsed = setMealPlanChoreConfigSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+      const config = await mealPlanService.setChoreConfig({ familyId: req.auth!.familyId, ...parsed.data });
       res.json(config);
     },
   };

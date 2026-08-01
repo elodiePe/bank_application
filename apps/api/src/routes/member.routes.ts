@@ -6,6 +6,7 @@ import { authenticate } from '../middleware/authenticate.js';
 import { requireFamilyOwner } from '../middleware/requireFamilyOwner.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { createRequirePermission } from '../middleware/requirePermission.js';
+import { createRequireParentOrTeen } from '../middleware/requireParentOrTeen.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { familyAuthRateLimiter } from '../middleware/rateLimiters.js';
 
@@ -13,6 +14,7 @@ export function createMemberRouter(prisma: PrismaClient) {
   const memberService = createMemberService(prisma);
   const controller = createMemberController(memberService);
   const requirePermission = createRequirePermission(prisma);
+  const requireParentOrTeen = createRequireParentOrTeen(prisma);
 
   const router = Router();
 
@@ -53,6 +55,18 @@ export function createMemberRouter(prisma: PrismaClient) {
   // Self-service credential change — available to both parents and children (they only
   // ever have a PIN to change; the service rejects if the caller has no PIN configured).
   router.post('/me/change-pin', asyncHandler((req, res) => controller.changeOwnPin(req, res)));
+  router.post(
+    '/me/points-visibility',
+    asyncHandler((req, res) => controller.setShowPointsBalance(req, res)),
+  );
+
+  // Trimmed-down roster (no email, no permission booleans) for the meal-plan/laundry member
+  // pickers — a parent or a TEEN-interface child can reach it, unlike the full listing below.
+  router.get(
+    '/roster',
+    requireParentOrTeen,
+    asyncHandler((req, res) => controller.listHouseholdRoster(req, res)),
+  );
 
   const parentRouter = Router();
   parentRouter.use(requireRole('PARENT'));

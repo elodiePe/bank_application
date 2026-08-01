@@ -8,12 +8,17 @@ import type {
   ResetPinInput,
   SetChildInterfaceLevelInput,
   SetEmailInput,
+  SetPointsVisibilityInput,
   UpdatePermissionsInput,
 } from '@banque-familiale/shared';
 import { apiGet, apiPatch, apiPost } from './api.js';
 
 export function fetchMembers(): Promise<FamilyMemberDetail[]> {
   return apiGet<FamilyMemberDetail[]>('/members');
+}
+
+export function fetchHouseholdRoster(): Promise<FamilyMemberDetail[]> {
+  return apiGet<FamilyMemberDetail[]>('/members/roster');
 }
 
 export function bootstrapParent(input: BootstrapParentInput): Promise<FamilyMemberDetail> {
@@ -26,6 +31,10 @@ export function setOwnEmail(input: SetEmailInput): Promise<void> {
 
 export function changeOwnPin(input: ChangePinInput): Promise<void> {
   return apiPost<void>('/members/me/change-pin', input);
+}
+
+export function setShowPointsBalance(input: SetPointsVisibilityInput): Promise<void> {
+  return apiPost<void>('/members/me/points-visibility', input);
 }
 
 export function addMember(input: AddMemberInput): Promise<FamilyMemberDetail> {

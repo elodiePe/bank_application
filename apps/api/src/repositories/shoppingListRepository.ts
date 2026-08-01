@@ -35,6 +35,10 @@ export function createShoppingListRepository(prisma: Db) {
     async delete(id: string) {
       await prisma.shoppingListItem.delete({ where: { id } });
     },
+
+    async deleteAllChecked(familyId: string) {
+      await prisma.shoppingListItem.deleteMany({ where: { familyId, isChecked: true } });
+    },
   };
 }
 

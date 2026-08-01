@@ -40,6 +40,7 @@ export function AddChoreModal({ children, onClose }: AddChoreModalProps) {
       recurrence: 'DAILY',
       rewardType: 'MONEY',
       rewardCents: 50,
+      requiresApproval: true,
     },
   });
 
@@ -60,7 +61,7 @@ export function AddChoreModal({ children, onClose }: AddChoreModalProps) {
   }
 
   return (
-    <Modal open onClose={onClose} title="Ajouter une corvée">
+    <Modal open onClose={onClose} title="Ajouter une tâche">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <p className="text-sm font-medium">Modèles rapides</p>
         <div className="flex flex-wrap gap-2">
@@ -122,7 +123,7 @@ export function AddChoreModal({ children, onClose }: AddChoreModalProps) {
 
         <span className="text-sm font-medium">Récompense</span>
         <div className="flex gap-2">
-          {(['MONEY', 'POINTS'] as const).map((type) => (
+          {(['MONEY', 'POINTS', 'NONE'] as const).map((type) => (
             <button
               key={type}
               type="button"
@@ -138,7 +139,7 @@ export function AddChoreModal({ children, onClose }: AddChoreModalProps) {
           ))}
         </div>
 
-        {rewardType === 'MONEY' ? (
+        {rewardType === 'MONEY' && (
           <>
             <label className="text-sm font-medium" htmlFor="rewardCents">
               Montant (centimes)
@@ -154,7 +155,8 @@ export function AddChoreModal({ children, onClose }: AddChoreModalProps) {
               <p className="text-sm text-red-600 dark:text-red-400">{errors.rewardCents.message}</p>
             )}
           </>
-        ) : (
+        )}
+        {rewardType === 'POINTS' && (
           <>
             <label className="text-sm font-medium" htmlFor="rewardPoints">
               Nombre de points
@@ -171,6 +173,16 @@ export function AddChoreModal({ children, onClose }: AddChoreModalProps) {
             )}
           </>
         )}
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            defaultChecked
+            {...register('requiresApproval')}
+            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-700"
+          />
+          Nécessite une validation du parent
+        </label>
 
         {createChore.isError && (
           <p className="text-sm text-red-600 dark:text-red-400">

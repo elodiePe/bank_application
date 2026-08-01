@@ -1,10 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { SetMealPlanDayInput, SetMealPlanRotationOrderInput } from '@banque-familiale/shared';
+import type {
+  SetMealPlanChoreConfigInput,
+  SetMealPlanDayInput,
+  SetMealPlanOccurrenceStatusInput,
+  SetMealPlanRotationOrderInput,
+} from '@banque-familiale/shared';
 import {
+  fetchMealPlanChoreConfig,
   fetchMealPlanConfig,
   fetchMealPlanRotationOrder,
   fetchMealPlanUpcoming,
+  setMealPlanChoreConfig,
   setMealPlanDay,
+  setMealPlanOccurrenceStatus,
   setMealPlanRotationOrder,
 } from '../services/mealPlan.service.js';
 
@@ -36,6 +44,26 @@ export function useSetMealPlanDay() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: SetMealPlanDayInput) => setMealPlanDay(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['meal-plan'] }),
+  });
+}
+
+export function useMealPlanChoreConfig() {
+  return useQuery({ queryKey: ['meal-plan', 'chore-config'], queryFn: fetchMealPlanChoreConfig, staleTime: 30_000 });
+}
+
+export function useSetMealPlanChoreConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SetMealPlanChoreConfigInput) => setMealPlanChoreConfig(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['meal-plan'] }),
+  });
+}
+
+export function useSetMealPlanOccurrenceStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SetMealPlanOccurrenceStatusInput) => setMealPlanOccurrenceStatus(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['meal-plan'] }),
   });
 }

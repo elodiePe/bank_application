@@ -12,7 +12,7 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   STOCK_BUY: "Achat d'actions",
   STOCK_SELL: "Vente d'actions",
   STOCK_GIFT: "Cadeau d'actions",
-  CHORE_REWARD: 'Récompense corvée',
+  CHORE_REWARD: 'Récompense tâche',
 };
 
 export const TRANSACTION_TYPE_ICONS: Record<TransactionType, string> = {

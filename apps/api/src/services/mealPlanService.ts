@@ -1,20 +1,36 @@
-import type { MealPlanSlot, PrismaClient, User } from '@prisma/client';
-import type { MealPlanDayConfig, MealPlanDaySummary, MealPlanRotationOrderSummary } from '@banque-familiale/shared';
+import type { MealPlanSlot, PrismaClient } from '@prisma/client';
+import type {
+  MealPlanChoreConfigSummary,
+  MealPlanDayConfig,
+  MealPlanDaySummary,
+  MealPlanRotationOrderSummary,
+} from '@banque-familiale/shared';
 import { createMealPlanRepository } from '../repositories/mealPlanRepository.js';
 import { createUserRepository } from '../repositories/userRepository.js';
 import { createNotificationService } from './notificationService.js';
+import { createChoreService } from './choreService.js';
 import { ValidationError } from '../utils/errors.js';
 import { getStartOfDay, weekdayIndex, weekIndexFor } from '../utils/dateWeek.js';
 
-type SlotWithFixedUser = MealPlanSlot & { fixedUser: User | null };
 type MemberLookup = Map<string, { firstName: string }>;
 
-function toConfig(slot: SlotWithFixedUser): MealPlanDayConfig {
+function firstNamesFor(userIds: string[], members: MemberLookup): string[] {
+  return userIds.map((id) => members.get(id)?.firstName ?? '?');
+}
+
+/** Rotation order is stored as JSON (an array of turns, each turn an array of userIds) — this
+ * narrows the loosely-typed Prisma JsonValue back to the shape the app actually writes. */
+function asGroups(value: unknown): string[][] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((g): g is string[] => Array.isArray(g));
+}
+
+function toConfig(slot: MealPlanSlot, members: MemberLookup): MealPlanDayConfig {
   return {
     weekday: slot.weekday,
     mode: slot.mode,
-    fixedUserId: slot.fixedUserId,
-    fixedFirstName: slot.fixedUser?.firstName ?? null,
+    fixedUserIds: slot.fixedUserIds,
+    fixedFirstNames: firstNamesFor(slot.fixedUserIds, members),
   };
 }
 
@@ -22,7 +38,7 @@ function toConfig(slot: SlotWithFixedUser): MealPlanDayConfig {
  * rank so consecutive turns (in calendar order, across week boundaries) advance the shared
  * rotation order by exactly one step, no matter which specific weekdays are rotating or how
  * many there are. */
-function rotatingWeekdaysSorted(slotsByWeekday: Map<number, SlotWithFixedUser>): number[] {
+function rotatingWeekdaysSorted(slotsByWeekday: Map<number, MealPlanSlot>): number[] {
   return [...slotsByWeekday.values()]
     .filter((s) => s.mode === 'ROTATING')
     .map((s) => s.weekday)
@@ -35,29 +51,31 @@ function rotatingWeekdaysSorted(slotsByWeekday: Map<number, SlotWithFixedUser>):
  * advances the order by one step per turn — no stored per-week state. Offsetting by the raw
  * weekday number instead of this rank would collide whenever the rotating weekdays aren't a
  * contiguous 0..N-1 set (e.g. Monday and Friday both being ROTATING would land on the same
- * person every time, since 0 and 4 share a residue mod a 4-person order). */
-function computeAssignee(
-  slot: SlotWithFixedUser | null,
+ * person every time, since 0 and 4 share a residue mod a 4-person order). A turn can be shared
+ * by several people at once — the returned array is that turn's whole group. */
+function computeAssignees(
+  slot: MealPlanSlot | null,
   weekday: number,
   date: Date,
-  rotationOrder: string[],
+  rotationGroups: string[][],
   rotatingWeekdays: number[],
-): string | null {
-  if (!slot) return null;
-  if (slot.mode === 'FIXED') return slot.fixedUserId;
-  if (rotationOrder.length === 0 || rotatingWeekdays.length === 0) return null;
+): string[] {
+  if (!slot) return [];
+  if (slot.mode === 'FIXED') return slot.fixedUserIds;
+  if (rotationGroups.length === 0 || rotatingWeekdays.length === 0) return [];
   const rank = rotatingWeekdays.indexOf(weekday);
-  if (rank === -1) return null;
-  const length = rotationOrder.length;
+  if (rank === -1) return [];
+  const length = rotationGroups.length;
   const turnNumber = weekIndexFor(date) * rotatingWeekdays.length + rank;
   const index = ((turnNumber % length) + length) % length;
-  return rotationOrder[index]!;
+  return rotationGroups[index]!;
 }
 
 export function createMealPlanService(prisma: PrismaClient) {
   const repo = createMealPlanRepository(prisma);
   const userRepo = createUserRepository(prisma);
   const notificationService = createNotificationService(prisma);
+  const choreService = createChoreService(prisma);
 
   async function memberLookup(familyId: string): Promise<MemberLookup> {
     const members = await userRepo.listFamilyMembers(familyId);
@@ -72,90 +90,161 @@ export function createMealPlanService(prisma: PrismaClient) {
     return members;
   }
 
-  async function getRotationOrderIds(familyId: string): Promise<string[]> {
+  async function getRotationGroups(familyId: string): Promise<string[][]> {
     const row = await repo.findRotationOrder(familyId);
-    return row?.orderedUserIds ?? [];
+    return row ? asGroups(row.orderedGroups) : [];
   }
 
-  function summaryFor(
+  function baseSummaryFor(
     date: Date,
-    slotsByWeekday: Map<number, SlotWithFixedUser>,
-    rotationOrder: string[],
+    slotsByWeekday: Map<number, MealPlanSlot>,
+    rotationGroups: string[][],
     rotatingWeekdays: number[],
     members: MemberLookup,
-  ): MealPlanDaySummary {
+  ): { date: string; weekday: number; assignedUserIds: string[]; assignedFirstNames: string[] } {
     const weekday = weekdayIndex(date);
     const slot = slotsByWeekday.get(weekday) ?? null;
-    const assignedUserId = computeAssignee(slot, weekday, date, rotationOrder, rotatingWeekdays);
+    const assignedUserIds = computeAssignees(slot, weekday, date, rotationGroups, rotatingWeekdays);
     return {
       date: date.toISOString().slice(0, 10),
       weekday,
-      assignedUserId,
-      assignedFirstName: assignedUserId ? (members.get(assignedUserId)?.firstName ?? null) : null,
+      assignedUserIds,
+      assignedFirstNames: firstNamesFor(assignedUserIds, members),
     };
   }
 
   return {
     async list(familyId: string): Promise<MealPlanDayConfig[]> {
-      const slots = await repo.listForFamily(familyId);
-      return slots.map(toConfig);
+      const [slots, members] = await Promise.all([repo.listForFamily(familyId), memberLookup(familyId)]);
+      return slots.map((s) => toConfig(s, members));
     },
 
     async getRotationOrder(familyId: string): Promise<MealPlanRotationOrderSummary> {
-      const [orderedUserIds, members] = await Promise.all([getRotationOrderIds(familyId), memberLookup(familyId)]);
+      const [orderedGroups, members] = await Promise.all([getRotationGroups(familyId), memberLookup(familyId)]);
       return {
-        orderedUserIds,
-        orderedFirstNames: orderedUserIds.map((id) => members.get(id)?.firstName ?? '?'),
+        orderedGroups,
+        orderedGroupFirstNames: orderedGroups.map((group) => firstNamesFor(group, members)),
       };
     },
 
-    async setRotationOrder(params: { familyId: string; orderedUserIds: string[] }): Promise<MealPlanRotationOrderSummary> {
-      const members = await assertFamilyMembers(params.familyId, params.orderedUserIds);
-      await repo.setRotationOrder(params.familyId, params.orderedUserIds);
+    async setRotationOrder(params: { familyId: string; orderedGroups: string[][] }): Promise<MealPlanRotationOrderSummary> {
+      const members = await assertFamilyMembers(params.familyId, params.orderedGroups.flat());
+      await repo.setRotationOrder(params.familyId, params.orderedGroups);
       return {
-        orderedUserIds: params.orderedUserIds,
-        orderedFirstNames: params.orderedUserIds.map((id) => members.get(id)?.firstName ?? '?'),
+        orderedGroups: params.orderedGroups,
+        orderedGroupFirstNames: params.orderedGroups.map((group) => firstNamesFor(group, members)),
       };
     },
 
     /** Rolling window starting today — "each day that passes, the window shifts too". Also
-     * used for the "Mois" view, which shows the next 4 weeks rather than a calendar month. */
+     * used for the "Mois" view, which shows the next 4 weeks rather than a calendar month.
+     * Overlays each date's personal done/postponed status on top of the calendar-computed
+     * assignee: a postponed date's original assignees carry over as extra assignees on
+     * whichever date it was pushed to, and the original date is flagged `postponedTo` so the
+     * UI can show "reporté" instead of an action there. */
     async listUpcoming(familyId: string, days: number): Promise<MealPlanDaySummary[]> {
-      const [slots, rotationOrder, members] = await Promise.all([
+      const today = getStartOfDay(new Date());
+      const rangeEnd = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
+      const [slots, rotationGroups, members, statuses] = await Promise.all([
         repo.listForFamily(familyId),
-        getRotationOrderIds(familyId),
+        getRotationGroups(familyId),
         memberLookup(familyId),
+        repo.listOccurrenceStatusesInRange(familyId, today, rangeEnd),
       ]);
       const slotsByWeekday = new Map(slots.map((s) => [s.weekday, s]));
       const rotatingWeekdays = rotatingWeekdaysSorted(slotsByWeekday);
-      const today = getStartOfDay(new Date());
+
+      const statusByDate = new Map(statuses.map((s) => [s.date.toISOString().slice(0, 10), s]));
+      const incomingByDate = new Map<string, { userIds: string[]; firstNames: string[] }>();
+      for (const status of statuses) {
+        if (!status.postponedToDate) continue;
+        const targetKey = status.postponedToDate.toISOString().slice(0, 10);
+        const originBase = baseSummaryFor(status.date, slotsByWeekday, rotationGroups, rotatingWeekdays, members);
+        const bucket = incomingByDate.get(targetKey) ?? { userIds: [], firstNames: [] };
+        originBase.assignedUserIds.forEach((id, i) => {
+          if (!bucket.userIds.includes(id)) {
+            bucket.userIds.push(id);
+            bucket.firstNames.push(originBase.assignedFirstNames[i]!);
+          }
+        });
+        incomingByDate.set(targetKey, bucket);
+      }
 
       const result: MealPlanDaySummary[] = [];
       for (let i = 0; i < days; i++) {
         const date = new Date(today.getTime() + i * 24 * 60 * 60 * 1000);
-        result.push(summaryFor(date, slotsByWeekday, rotationOrder, rotatingWeekdays, members));
+        const base = baseSummaryFor(date, slotsByWeekday, rotationGroups, rotatingWeekdays, members);
+        const status = statusByDate.get(base.date);
+        const incoming = incomingByDate.get(base.date);
+
+        let assignedUserIds = base.assignedUserIds;
+        let assignedFirstNames = base.assignedFirstNames;
+        if (incoming) {
+          incoming.userIds.forEach((id, i) => {
+            if (!assignedUserIds.includes(id)) {
+              assignedUserIds = [...assignedUserIds, id];
+              assignedFirstNames = [...assignedFirstNames, incoming.firstNames[i]!];
+            }
+          });
+        }
+
+        result.push({
+          ...base,
+          assignedUserIds,
+          assignedFirstNames,
+          done: status?.done ?? false,
+          postponedTo: status?.postponedToDate ? status.postponedToDate.toISOString().slice(0, 10) : null,
+        });
       }
       return result;
+    },
+
+    /** A personal, self-reported checkbox on one calendar date — either mark it done, or push
+     * it to another date (that date's entry gains the original assignees). Never changes who's
+     * assigned; purely a display overlay on the calendar-driven rotation. */
+    async setOccurrenceStatus(params: {
+      familyId: string;
+      date: string;
+      done?: boolean;
+      postponeToDate?: string | null;
+    }): Promise<void> {
+      const date = getStartOfDay(new Date(params.date));
+      if (Number.isNaN(date.getTime())) throw new ValidationError('Date invalide');
+
+      const data: { done?: boolean; postponedToDate?: Date | null } = {};
+      if (params.done !== undefined) data.done = params.done;
+      if (params.postponeToDate !== undefined) {
+        if (params.postponeToDate === null) {
+          data.postponedToDate = null;
+        } else {
+          const target = getStartOfDay(new Date(params.postponeToDate));
+          if (Number.isNaN(target.getTime())) throw new ValidationError('Date de report invalide');
+          data.postponedToDate = target;
+        }
+      }
+
+      await repo.setOccurrenceStatus(params.familyId, date, data);
     },
 
     async setDay(params: {
       familyId: string;
       weekday: number;
       mode: 'FIXED' | 'ROTATING';
-      fixedUserId?: string;
+      fixedUserIds?: string[];
     }): Promise<MealPlanDayConfig> {
       if (params.mode === 'FIXED') {
-        await assertFamilyMembers(params.familyId, [params.fixedUserId!]);
+        await assertFamilyMembers(params.familyId, params.fixedUserIds!);
       }
 
       const slot = await repo.upsertDay(params.familyId, params.weekday, {
         mode: params.mode,
-        fixedUserId: params.mode === 'FIXED' ? params.fixedUserId! : null,
+        fixedUserIds: params.mode === 'FIXED' ? params.fixedUserIds! : [],
       });
-      return toConfig(slot);
+      const members = await memberLookup(params.familyId);
+      return toConfig(slot, members);
     },
 
-    /** Hourly catch-up: notifies today's cook, once per family per calendar day. */
+    /** Hourly catch-up: notifies today's cook(s), once per family per calendar day. */
     async processDailyCookNotifications(now: Date = new Date()): Promise<number> {
       return runCookNotificationPass(getStartOfDay(now), 'TODAY', (userId) =>
         notificationService.notifyMealPlanTurn({ userId }),
@@ -173,11 +262,101 @@ export function createMealPlanService(prisma: PrismaClient) {
         notificationService.notifyMealPlanTurnTomorrow({ userId }),
       );
     },
+
+    async getChoreConfig(familyId: string): Promise<MealPlanChoreConfigSummary> {
+      const config = await repo.findChoreConfig(familyId);
+      return {
+        enabled: config?.enabled ?? false,
+        requiresApproval: config?.requiresApproval ?? true,
+        rewardType: config?.rewardType ?? 'POINTS',
+        rewardCents: config?.rewardCents ?? null,
+        rewardPoints: config?.rewardPoints ?? null,
+      };
+    },
+
+    async setChoreConfig(params: {
+      familyId: string;
+      enabled: boolean;
+      requiresApproval: boolean;
+      rewardType: 'MONEY' | 'POINTS' | 'NONE';
+      rewardCents?: number;
+      rewardPoints?: number;
+    }): Promise<MealPlanChoreConfigSummary> {
+      const rewardCents = params.rewardType === 'MONEY' ? (params.rewardCents ?? null) : null;
+      const rewardPoints = params.rewardType === 'POINTS' ? (params.rewardPoints ?? null) : null;
+      await repo.setChoreConfig(params.familyId, {
+        enabled: params.enabled,
+        requiresApproval: params.requiresApproval,
+        rewardType: params.rewardType,
+        rewardCents,
+        rewardPoints,
+      });
+      return {
+        enabled: params.enabled,
+        requiresApproval: params.requiresApproval,
+        rewardType: params.rewardType,
+        rewardCents,
+        rewardPoints,
+      };
+    },
+
+    /** Hourly catch-up: for every family with chore-generation enabled, gives each of today's
+     * cooks a real Chore — only when they're a child, since chores are a kid-reward mechanism
+     * (a shared turn with a parent still gives the child their own chore). Dedup reuses the
+     * same TODAY-per-family log as the cook notification, under a distinct kind. */
+    async processDailyMealPlanChores(now: Date = new Date()): Promise<number> {
+      const today = getStartOfDay(now);
+      const weekday = weekdayIndex(today);
+      const enabledFamilies = await repo.listFamilyIdsWithChoreGenEnabled();
+      let created = 0;
+
+      for (const { familyId } of enabledFamilies) {
+        const existingLog = await repo.findNotificationLog(familyId, today, 'CHORE');
+        if (existingLog) continue;
+
+        const [slots, rotationGroups, config] = await Promise.all([
+          repo.listForFamily(familyId),
+          getRotationGroups(familyId),
+          repo.findChoreConfig(familyId),
+        ]);
+        if (!config?.enabled) continue;
+
+        const slotsByWeekday = new Map(slots.map((s) => [s.weekday, s]));
+        const slot = slotsByWeekday.get(weekday) ?? null;
+        const userIds = computeAssignees(slot, weekday, today, rotationGroups, rotatingWeekdaysSorted(slotsByWeekday));
+        if (userIds.length === 0) continue;
+
+        let anyCreated = false;
+        for (const userId of userIds) {
+          const cook = await userRepo.findById(userId);
+          if (!cook || cook.role !== 'CHILD') continue;
+
+          await choreService.createChore({
+            familyId,
+            childUserId: userId,
+            title: 'Préparer le repas du soir',
+            rewardType: config.rewardType,
+            rewardCents: config.rewardCents ?? undefined,
+            rewardPoints: config.rewardPoints ?? undefined,
+            recurrence: 'ONCE',
+            requiresApproval: config.requiresApproval,
+          });
+          anyCreated = true;
+        }
+
+        if (anyCreated) {
+          await repo.createNotificationLog(familyId, today, userIds[0]!, 'CHORE');
+          created += 1;
+        }
+      }
+
+      return created;
+    },
   };
 
-  /** Shared by both the same-day and evening-before passes: finds `targetDate`'s cook for
-   * every family configured on that weekday, notifies them once, and logs it under `kind` so
-   * the hourly check never repeats itself. */
+  /** Shared by both the same-day and evening-before passes: finds `targetDate`'s cook(s) for
+   * every family configured on that weekday, notifies each of them once, and logs it under
+   * `kind` so the hourly check never repeats itself. */
   async function runCookNotificationPass(
     targetDate: Date,
     kind: 'TODAY' | 'ADVANCE',
@@ -191,17 +370,19 @@ export function createMealPlanService(prisma: PrismaClient) {
       const existingLog = await repo.findNotificationLog(familyId, targetDate, kind);
       if (existingLog) continue;
 
-      const [slots, rotationOrder] = await Promise.all([
+      const [slots, rotationGroups] = await Promise.all([
         repo.listForFamily(familyId),
-        getRotationOrderIds(familyId),
+        getRotationGroups(familyId),
       ]);
       const slotsByWeekday = new Map(slots.map((s) => [s.weekday, s]));
       const slot = slotsByWeekday.get(weekday) ?? null;
-      const userId = computeAssignee(slot, weekday, targetDate, rotationOrder, rotatingWeekdaysSorted(slotsByWeekday));
-      if (!userId) continue;
+      const userIds = computeAssignees(slot, weekday, targetDate, rotationGroups, rotatingWeekdaysSorted(slotsByWeekday));
+      if (userIds.length === 0) continue;
 
-      await notify(userId);
-      await repo.createNotificationLog(familyId, targetDate, userId, kind);
+      for (const userId of userIds) {
+        await notify(userId);
+      }
+      await repo.createNotificationLog(familyId, targetDate, userIds[0]!, kind);
       notified += 1;
     }
 

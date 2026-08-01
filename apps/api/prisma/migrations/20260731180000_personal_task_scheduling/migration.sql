@@ -1,0 +1,3 @@
+ALTER TABLE "PersonalTask" ADD COLUMN "recurring" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "PersonalTask" ADD COLUMN "date" TIMESTAMP(3);
+ALTER TABLE "PersonalTask" ADD COLUMN "lastDoneDate" TIMESTAMP(3);

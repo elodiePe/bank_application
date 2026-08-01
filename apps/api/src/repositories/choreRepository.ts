@@ -19,32 +19,46 @@ export function createChoreRepository(prisma: Db) {
       return prisma.chore.findMany({ where: { familyId }, include: withChild, orderBy: { createdAt: 'asc' } });
     },
 
-    listActiveForChild(childUserId: string) {
+    /** Excludes chores whose `startsOn` (set by "reporter à demain") is still in the future —
+     * a postponed chore stays invisible to the child until its date arrives. */
+    listActiveForChild(childUserId: string, now: Date) {
       return prisma.chore.findMany({
-        where: { childUserId, active: true },
+        where: { childUserId, active: true, OR: [{ startsOn: null }, { startsOn: { lte: now } }] },
         include: withChild,
         orderBy: { createdAt: 'asc' },
       });
     },
 
-    /** Every active chore across every family — scanned periodically to find ones due for a
-     * "not done yet" reminder. */
-    listAllActive() {
-      return prisma.chore.findMany({ where: { active: true }, include: withChild });
+    /** Every active, already-started chore across every family — scanned periodically to find
+     * ones due for a "not done yet" reminder. Same startsOn exclusion as listActiveForChild. */
+    listAllActive(now: Date) {
+      return prisma.chore.findMany({
+        where: { active: true, OR: [{ startsOn: null }, { startsOn: { lte: now } }] },
+        include: withChild,
+      });
     },
 
     markReminderSent(id: string, at: Date) {
       return prisma.chore.update({ where: { id }, data: { lastReminderSentAt: at } });
     },
 
+    markEveningReminderSent(id: string, at: Date) {
+      return prisma.chore.update({ where: { id }, data: { lastEveningReminderSentAt: at } });
+    },
+
+    delete(id: string) {
+      return prisma.chore.delete({ where: { id } });
+    },
+
     update(
       id: string,
       data: {
         title?: string;
-        rewardType?: 'MONEY' | 'POINTS';
+        rewardType?: 'MONEY' | 'POINTS' | 'NONE';
         rewardCents?: number | null;
         rewardPoints?: number | null;
         active?: boolean;
+        requiresApproval?: boolean;
       },
     ) {
       return prisma.chore.update({ where: { id }, data, include: withChild });

@@ -16,6 +16,8 @@ export function ChildPointsSummary() {
   const myRewards = (rewards.data ?? []).filter((r) => r.childUserId === user?.id);
   const nextReward = myRewards.slice().sort((a, b) => a.pointsRequired - b.pointsRequired).find((r) => r.pointsRequired > points);
 
+  if (user?.showPointsBalance === false) return null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}

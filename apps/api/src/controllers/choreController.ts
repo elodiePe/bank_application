@@ -43,6 +43,21 @@ export function createChoreController(choreService: ChoreService) {
       res.json(chore);
     },
 
+    async remove(req: Request, res: Response) {
+      await choreService.deleteChore({ familyId: req.auth!.familyId, choreId: String(req.params.id) });
+      res.status(204).end();
+    },
+
+    async postpone(req: Request, res: Response) {
+      const chore = await choreService.postponeChore({
+        familyId: req.auth!.familyId,
+        choreId: String(req.params.id),
+        actorId: req.auth!.sub,
+        actorRole: req.auth!.role,
+      });
+      res.status(201).json(chore);
+    },
+
     async complete(req: Request, res: Response) {
       const completion = await choreService.completeChore({
         familyId: req.auth!.familyId,

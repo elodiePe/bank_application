@@ -8,6 +8,7 @@ import {
   resetPinSchema,
   setChildInterfaceLevelSchema,
   setEmailSchema,
+  setPointsVisibilitySchema,
   updatePermissionsSchema,
 } from '@banque-familiale/shared';
 import type { MemberService } from '../services/memberService.js';
@@ -17,6 +18,11 @@ export function createMemberController(memberService: MemberService) {
   return {
     async listMembers(req: Request, res: Response) {
       const members = await memberService.listMembers(req.auth!.familyId);
+      res.json(members);
+    },
+
+    async listHouseholdRoster(req: Request, res: Response) {
+      const members = await memberService.listHouseholdRoster(req.auth!.familyId);
       res.json(members);
     },
 
@@ -33,6 +39,14 @@ export function createMemberController(memberService: MemberService) {
       if (!parsed.success) throw new ValidationError(parsed.error.message);
 
       await memberService.changeOwnPin({ userId: req.auth!.sub, ...parsed.data });
+      res.status(204).end();
+    },
+
+    async setShowPointsBalance(req: Request, res: Response) {
+      const parsed = setPointsVisibilitySchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+      await memberService.setShowPointsBalance(req.auth!.sub, parsed.data.show);
       res.status(204).end();
     },
 

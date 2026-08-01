@@ -1,3 +1,4 @@
+import { useState, type ChangeEvent } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -5,7 +6,9 @@ import type { Sibling } from '@banque-familiale/shared';
 import { Modal } from './Modal.js';
 import { Select } from './Select.js';
 import { useCreateMoneyRequest } from '../hooks/useMoneyRequests.js';
+import { useCurrentUser } from '../hooks/useAuth.js';
 import { STORAGE_CURRENCY } from '../utils/currency.js';
+import { resizeImageToDataUrl } from '../utils/imageResize.js';
 
 const formSchema = z
   .object({
@@ -21,7 +24,12 @@ const formSchema = z
 type FormValues = z.infer<typeof formSchema>;
 
 export function RequestMoneyModal({ siblings, onClose }: { siblings: Sibling[]; onClose: () => void }) {
+  const { data: user } = useCurrentUser();
+  // Only offered to MIDDLE/TEEN — a YOUNG child's simplified flow doesn't get this extra step.
+  const canAttachReceipt = user?.role === 'CHILD' && user.interfaceLevel !== 'YOUNG';
   const createRequest = useCreateMoneyRequest();
+  const [receiptPhotoDataUrl, setReceiptPhotoDataUrl] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
   const {
     register,
     control,
@@ -34,6 +42,17 @@ export function RequestMoneyModal({ siblings, onClose }: { siblings: Sibling[]; 
   });
   const type = watch('type');
 
+  async function onReceiptChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setReceiptError(null);
+    try {
+      setReceiptPhotoDataUrl(await resizeImageToDataUrl(file));
+    } catch {
+      setReceiptError("Impossible de lire cette photo, réessaie.");
+    }
+  }
+
   function onSubmit(values: FormValues) {
     createRequest.mutate(
       {
@@ -41,13 +60,14 @@ export function RequestMoneyModal({ siblings, onClose }: { siblings: Sibling[]; 
         amountCents: Math.round(values.amountChf * 100),
         comment: values.comment,
         targetUserId: values.type === 'TRANSFER_REQUEST' ? values.targetUserId : undefined,
+        receiptPhotoDataUrl: canAttachReceipt ? (receiptPhotoDataUrl ?? undefined) : undefined,
       },
       { onSuccess: onClose },
     );
   }
 
   return (
-    <Modal open onClose={onClose} title="Demander de l'argent">
+    <Modal open onClose={onClose} title="Faire une demande">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="text-sm font-medium" htmlFor="type">
           Type de demande
@@ -120,6 +140,40 @@ export function RequestMoneyModal({ siblings, onClose }: { siblings: Sibling[]; 
           {...register('comment')}
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
         />
+
+        {canAttachReceipt && (
+          <>
+            <label className="text-sm font-medium" htmlFor="receiptPhoto">
+              Photo du ticket de caisse (optionnel)
+            </label>
+            {receiptPhotoDataUrl ? (
+              <div className="flex items-center gap-3">
+                <img
+                  src={receiptPhotoDataUrl}
+                  alt="Ticket de caisse"
+                  className="h-16 w-16 rounded-lg object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setReceiptPhotoDataUrl(null)}
+                  className="text-sm text-red-600 hover:underline dark:text-red-400"
+                >
+                  Retirer la photo
+                </button>
+              </div>
+            ) : (
+              <input
+                id="receiptPhoto"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={onReceiptChange}
+                className="text-sm"
+              />
+            )}
+            {receiptError && <p className="text-sm text-red-600 dark:text-red-400">{receiptError}</p>}
+          </>
+        )}
 
         {createRequest.isError && (
           <p className="text-sm text-red-600 dark:text-red-400">Une erreur est survenue.</p>

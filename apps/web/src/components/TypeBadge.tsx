@@ -1,4 +1,4 @@
-/** Small uppercase pill labeling what kind of card this is (Corvée, Signalement, a money
+/** Small uppercase pill labeling what kind of card this is (Tâche, Signalement, a money
  * request type…) — needed once several different card types started sharing one list (e.g.
  * Accueil's merged "Demandes en attente"), since the content alone no longer makes it obvious. */
 export function TypeBadge({ children }: { children: string }) {
