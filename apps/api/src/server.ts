@@ -7,6 +7,7 @@ import { createChoreService } from './services/choreService.js';
 import { createMealPlanService } from './services/mealPlanService.js';
 import { createLaundryService } from './services/laundryService.js';
 import { createCustomNotificationService } from './services/customNotificationService.js';
+import { createMaintenanceService } from './services/maintenanceService.js';
 
 const app = createApp();
 const allowanceService = createAllowanceService(prisma);
@@ -15,6 +16,7 @@ const choreService = createChoreService(prisma);
 const mealPlanService = createMealPlanService(prisma);
 const laundryService = createLaundryService(prisma);
 const customNotificationService = createCustomNotificationService(prisma);
+const maintenanceService = createMaintenanceService(prisma);
 
 async function runAllowanceCatchUp() {
   try {
@@ -135,6 +137,18 @@ async function runCustomNotificationCheck() {
   }
 }
 
+async function runMaintenance() {
+  try {
+    const { meal, laundry, custom } = await maintenanceService.purgeOldNotificationLogs();
+    const total = meal + laundry + custom;
+    if (total > 0) {
+      console.log(`Nettoyage : ${total} ancien(s) log(s) de notification supprimé(s).`);
+    }
+  } catch (err) {
+    console.error('Échec du nettoyage des anciens logs :', err);
+  }
+}
+
 app.listen(env.port, () => {
   console.log(`API listening on http://localhost:${env.port}`);
   // All run immediately (catching up anything missed while the server was off), then hourly
@@ -145,6 +159,7 @@ app.listen(env.port, () => {
   void runMealPlanNotificationCheck();
   void runLaundryNotificationCheck();
   void runCustomNotificationCheck();
+  void runMaintenance();
   setInterval(() => void runAllowanceCatchUp(), 60 * 60 * 1000);
   setInterval(() => void runInterestCatchUp(), 60 * 60 * 1000);
   setInterval(() => void runChoreReminderCheck(), 60 * 60 * 1000);
@@ -153,4 +168,7 @@ app.listen(env.port, () => {
   // Custom notifications carry a specific time-of-day, so this one is checked far more often
   // than the others — otherwise a reminder set for 08:00 could slip by up to an hour.
   setInterval(() => void runCustomNotificationCheck(), 5 * 60 * 1000);
+  // Log cleanup only needs to run roughly once a day — every 24h is plenty, no need to
+  // re-check the 30-day cutoff more often than that.
+  setInterval(() => void runMaintenance(), 24 * 60 * 60 * 1000);
 });
