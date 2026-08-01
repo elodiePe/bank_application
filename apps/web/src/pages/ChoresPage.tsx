@@ -1,6 +1,5 @@
-import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
-import { motion, useDragControls, type PanInfo } from 'framer-motion';
 import type { PersonalTaskSummary } from '@banque-familiale/shared';
 import { useCurrentUser } from '../hooks/useAuth.js';
 import { useParentMode } from '../hooks/useParentMode.js';
@@ -73,7 +72,6 @@ const SUB_TAB_LABELS: Record<MaisonSubTab, string> = {
   laundry: 'Lessives',
 };
 const SUB_TAB_ORDER: MaisonSubTab[] = ['chores', 'meals', 'shopping', 'laundry'];
-const SWIPE_THRESHOLD = 60;
 
 /** Sub-tab lives in the URL (?tab=meals) so it can be reached directly from Accueil's
  * shortcuts, and so RootLayout's usage tracking can tell them apart — same pattern as
@@ -87,18 +85,6 @@ function useMaisonSubTab(): [MaisonSubTab, (tab: MaisonSubTab) => void] {
     setSearchParams(next === 'chores' ? {} : { tab: next }, { replace: true });
   };
   return [tab, setTab];
-}
-
-// Framer Motion's drag gesture claims the pointer on down, which otherwise swallows the click
-// on anything interactive underneath — so the drag is only started manually, and never when the
-// touch begins on an interactive element (a chore's "Valider" button, a day in the meal plan…).
-const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, [role="button"], [contenteditable="true"]';
-
-function startSwipeUnlessInteractive(dragControls: ReturnType<typeof useDragControls>) {
-  return (event: ReactPointerEvent) => {
-    if ((event.target as HTMLElement).closest(INTERACTIVE_SELECTOR)) return;
-    dragControls.start(event);
-  };
 }
 
 function SubTabs({ active, onChange }: { active: MaisonSubTab; onChange: (tab: MaisonSubTab) => void }) {
@@ -123,53 +109,10 @@ function SubTabs({ active, onChange }: { active: MaisonSubTab; onChange: (tab: M
   );
 }
 
-/** Renders all 4 sub-tab panels side by side and slides between them — swipe left/right, or
- * use the SubTabs buttons — same technique as the Argent/Actions swipe on the Argent page. */
-function SwipeablePanels({
-  tab,
-  onChange,
-  panels,
-}: {
-  tab: MaisonSubTab;
-  onChange: (tab: MaisonSubTab) => void;
-  panels: Record<MaisonSubTab, ReactNode>;
-}) {
-  const index = SUB_TAB_ORDER.indexOf(tab);
-  const dragControls = useDragControls();
-
-  const handleDragEnd = (_: unknown, info: PanInfo) => {
-    if (info.offset.x < -SWIPE_THRESHOLD && index < SUB_TAB_ORDER.length - 1) {
-      onChange(SUB_TAB_ORDER[index + 1]!);
-    } else if (info.offset.x > SWIPE_THRESHOLD && index > 0) {
-      onChange(SUB_TAB_ORDER[index - 1]!);
-    }
-  };
-
-  return (
-    <div
-      className="overflow-hidden"
-      style={{ touchAction: 'pan-y' }}
-      onPointerDown={startSwipeUnlessInteractive(dragControls)}
-    >
-      <motion.div
-        className="flex w-[400%]"
-        animate={{ x: `-${index * (100 / 4)}%` }}
-        transition={{ type: 'tween', duration: 0.25 }}
-        drag="x"
-        dragListener={false}
-        dragControls={dragControls}
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.12}
-        onDragEnd={handleDragEnd}
-      >
-        {SUB_TAB_ORDER.map((t) => (
-          <div key={t} className="w-1/4 shrink-0 px-1">
-            {panels[t]}
-          </div>
-        ))}
-      </motion.div>
-    </div>
-  );
+/** Renders whichever sub-tab panel is active — switched only via the SubTabs buttons, no
+ * swipe gesture. */
+function SubTabPanel({ tab, panels }: { tab: MaisonSubTab; panels: Record<MaisonSubTab, ReactNode> }) {
+  return <>{panels[tab]}</>;
 }
 
 /** "Maison" section: tâches, repas du soir, and the shared shopping list, presented as
@@ -258,9 +201,8 @@ function ParentChoresPage() {
     <div className="space-y-6">
       <SubTabs active={tab} onChange={setTab} />
 
-      <SwipeablePanels
+      <SubTabPanel
         tab={tab}
-        onChange={setTab}
         panels={{ chores: choresPanel, meals: <MealPlanCard />, shopping: <ShoppingList />, laundry: <LaundryCard /> }}
       />
     </div>
@@ -315,9 +257,8 @@ function ChildChoresPage() {
     <div className="space-y-6">
       <SubTabs active={tab} onChange={setTab} />
 
-      <SwipeablePanels
+      <SubTabPanel
         tab={tab}
-        onChange={setTab}
         panels={{ chores: choresPanel, meals: <MealPlanCard />, shopping: <ShoppingList />, laundry: <LaundryCard /> }}
       />
     </div>

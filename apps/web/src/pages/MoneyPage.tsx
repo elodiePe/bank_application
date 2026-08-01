@@ -1,6 +1,5 @@
-import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { motion, useDragControls, type PanInfo } from 'framer-motion';
 import type { ChildBalanceSummary, TransactionSummary } from '@banque-familiale/shared';
 import { useCurrentUser, usePermission } from '../hooks/useAuth.js';
 import { useChildOverview, useMyTransactions, useParentOverview, useRecentTransactions } from '../hooks/useDashboard.js';
@@ -64,71 +63,10 @@ function SubTabs({
   );
 }
 
-const SWIPE_THRESHOLD = 60;
-
-// Framer Motion's drag gesture claims the pointer on down, which otherwise swallows the click
-// on anything interactive underneath (e.g. tapping a stock holding to open its detail) — so the
-// drag is only started manually, and never when the touch begins on an interactive element.
-const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, [role="button"], [contenteditable="true"]';
-
-function startSwipeUnlessInteractive(dragControls: ReturnType<typeof useDragControls>) {
-  return (event: ReactPointerEvent) => {
-    if ((event.target as HTMLElement).closest(INTERACTIVE_SELECTOR)) return;
-    dragControls.start(event);
-  };
-}
-
-/** Renders every sub-tab panel side by side and slides between them — swipe left/right, or
- * use the SubTabs buttons. All panels stay mounted so the drag never has to wait on data. */
-function SwipeableSubTabs({
-  tab,
-  onChange,
-  tabOrder,
-  panels,
-}: {
-  tab: MoneySubTab;
-  onChange: (tab: MoneySubTab) => void;
-  tabOrder: MoneySubTab[];
-  panels: Partial<Record<MoneySubTab, ReactNode>>;
-}) {
-  const index = tabOrder.indexOf(tab);
-  const count = tabOrder.length;
-  const dragControls = useDragControls();
-
-  const handleDragEnd = (_: unknown, info: PanInfo) => {
-    if (info.offset.x < -SWIPE_THRESHOLD && index < count - 1) {
-      onChange(tabOrder[index + 1]!);
-    } else if (info.offset.x > SWIPE_THRESHOLD && index > 0) {
-      onChange(tabOrder[index - 1]!);
-    }
-  };
-
-  return (
-    <div
-      className="overflow-hidden"
-      style={{ touchAction: 'pan-y' }}
-      onPointerDown={startSwipeUnlessInteractive(dragControls)}
-    >
-      <motion.div
-        className="flex"
-        style={{ width: `${count * 100}%` }}
-        animate={{ x: `-${index * (100 / count)}%` }}
-        transition={{ type: 'tween', duration: 0.25 }}
-        drag="x"
-        dragListener={false}
-        dragControls={dragControls}
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.12}
-        onDragEnd={handleDragEnd}
-      >
-        {tabOrder.map((t) => (
-          <div key={t} className="shrink-0 px-2" style={{ width: `${100 / count}%` }}>
-            {panels[t]}
-          </div>
-        ))}
-      </motion.div>
-    </div>
-  );
+/** Renders whichever sub-tab panel is active — switched only via the SubTabs buttons, no
+ * swipe gesture. */
+function SubTabPanel({ tab, panels }: { tab: MoneySubTab; panels: Partial<Record<MoneySubTab, ReactNode>> }) {
+  return <>{panels[tab]}</>;
 }
 
 const RECENT_TRANSACTIONS_LIMIT = 5;
@@ -247,12 +185,7 @@ function ParentMoneyPage() {
     <div className="space-y-6">
       <SubTabs active={tab} onChange={setTab} tabOrder={PARENT_TAB_ORDER} />
 
-      <SwipeableSubTabs
-        tab={tab}
-        onChange={setTab}
-        tabOrder={PARENT_TAB_ORDER}
-        panels={{ money: moneyPanel, stocks: stocksPanel }}
-      />
+      <SubTabPanel tab={tab} panels={{ money: moneyPanel, stocks: stocksPanel }} />
 
       {moneyAction && (
         <MoneyActionModal
@@ -341,12 +274,7 @@ function ChildMoneyPage() {
     <div className="space-y-6">
       <SubTabs active={tab} onChange={setTab} tabOrder={CHILD_TAB_ORDER} />
 
-      <SwipeableSubTabs
-        tab={tab}
-        onChange={setTab}
-        tabOrder={CHILD_TAB_ORDER}
-        panels={{ money: moneyPanel, stocks: stocksPanel, savings: savingsPanel }}
-      />
+      <SubTabPanel tab={tab} panels={{ money: moneyPanel, stocks: stocksPanel, savings: savingsPanel }} />
 
       {disputeTarget && <DisputeModal transaction={disputeTarget} onClose={() => setDisputeTarget(null)} />}
     </div>

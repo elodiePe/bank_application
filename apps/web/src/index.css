@@ -1,3 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Safety net against any accidental horizontal overflow — this is a single-column,
+   mobile-first layout, so the page itself should never scroll sideways. */
+html,
+body {
+  overflow-x: hidden;
+}
