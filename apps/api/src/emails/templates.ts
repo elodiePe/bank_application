@@ -8,7 +8,7 @@ export interface EmailContent {
 export function verifyEmailTemplate(params: { familyName: string; verifyUrl: string }): EmailContent {
   const familyName = escapeHtml(params.familyName);
   return {
-    subject: 'Confirmez votre adresse e-mail — Banque Familiale',
+    subject: 'Confirmez votre adresse e-mail — FamilyApp',
     html: emailLayout({
       previewText: `Confirmez l'adresse e-mail du compte ${familyName}`,
       bodyHtml: `
@@ -25,7 +25,7 @@ export function passwordChangedTemplate(params: { firstName: string }): EmailCon
   const firstName = escapeHtml(params.firstName);
   const when = new Date().toLocaleString('fr-CH', { dateStyle: 'long', timeStyle: 'short' });
   return {
-    subject: 'Votre mot de passe a été modifié — Banque Familiale',
+    subject: 'Votre mot de passe a été modifié — FamilyApp',
     html: emailLayout({
       previewText: 'Le mot de passe de votre compte vient d\'être modifié',
       bodyHtml: `
@@ -40,7 +40,7 @@ export function passwordChangedTemplate(params: { firstName: string }): EmailCon
 export function deleteAccountRequestTemplate(params: { familyName: string; confirmUrl: string }): EmailContent {
   const familyName = escapeHtml(params.familyName);
   return {
-    subject: 'Confirmez la fermeture de votre compte famille — Banque Familiale',
+    subject: 'Confirmez la fermeture de votre compte famille — FamilyApp',
     html: emailLayout({
       previewText: `Confirmez la fermeture du compte ${familyName}`,
       bodyHtml: `
@@ -58,7 +58,7 @@ export function deleteAccountRequestTemplate(params: { familyName: string; confi
 export function resetPasswordRequestTemplate(params: { familyName: string; resetUrl: string }): EmailContent {
   const familyName = escapeHtml(params.familyName);
   return {
-    subject: 'Réinitialisez votre mot de passe — Banque Familiale',
+    subject: 'Réinitialisez votre mot de passe — FamilyApp',
     html: emailLayout({
       previewText: `Réinitialisez le mot de passe du compte ${familyName}`,
       bodyHtml: `
@@ -75,7 +75,7 @@ export function resetPasswordRequestTemplate(params: { familyName: string; reset
 export function resetMemberPinRequestTemplate(params: { firstName: string; resetUrl: string }): EmailContent {
   const firstName = escapeHtml(params.firstName);
   return {
-    subject: 'Réinitialisez votre code PIN — Banque Familiale',
+    subject: 'Réinitialisez votre code PIN — FamilyApp',
     html: emailLayout({
       previewText: 'Réinitialisez votre code PIN',
       bodyHtml: `
@@ -93,7 +93,7 @@ export function pinChangedTemplate(params: { firstName: string }): EmailContent 
   const firstName = escapeHtml(params.firstName);
   const when = new Date().toLocaleString('fr-CH', { dateStyle: 'long', timeStyle: 'short' });
   return {
-    subject: 'Votre code PIN a été modifié — Banque Familiale',
+    subject: 'Votre code PIN a été modifié — FamilyApp',
     html: emailLayout({
       previewText: 'Le code PIN de votre compte vient d\'être modifié',
       bodyHtml: `
@@ -108,13 +108,13 @@ export function pinChangedTemplate(params: { firstName: string }): EmailContent 
 export function accountDeletedTemplate(params: { familyName: string }): EmailContent {
   const familyName = escapeHtml(params.familyName);
   return {
-    subject: 'Votre compte famille a été supprimé — Banque Familiale',
+    subject: 'Votre compte famille a été supprimé — FamilyApp',
     html: emailLayout({
       previewText: `Le compte ${familyName} a été supprimé`,
       bodyHtml: `
         <h1 style="margin:0 0 12px;font-size:18px;">Compte supprimé</h1>
         <p style="margin:0 0 8px;">Le compte famille "${familyName}" et toutes ses données ont été définitivement supprimés, comme demandé.</p>
-        <p style="margin:16px 0 0;">Merci d'avoir utilisé Banque Familiale.</p>
+        <p style="margin:16px 0 0;">Merci d'avoir utilisé FamilyApp.</p>
       `,
     }),
   };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,41 +8,63 @@ import {
   CHILD_INTERFACE_LEVELS,
   CHILD_INTERFACE_LEVEL_LABELS,
   CHORE_TEMPLATES,
+  POINTS_REWARD_TEMPLATES,
   SUPPORTED_CURRENCIES,
+  WEEKDAY_LABELS,
   bootstrapParentSchema,
   type BootstrapParentInput,
 } from '@banque-familiale/shared';
-import { useAddMember, useUpdateMemberPermissions } from '../hooks/useMembers.js';
+import { useAddMember, useHouseholdRoster, useUpdateMemberPermissions } from '../hooks/useMembers.js';
 import { useParentOverview, useCompleteOnboarding } from '../hooks/useDashboard.js';
 import { useCreateChore } from '../hooks/useChores.js';
-import { useSetWeeklyAllowance, useSettings, useUpdateCurrency, useUpdateInterestRate } from '../hooks/useTransactionActions.js';
-import { usePushSubscription } from '../pwa/usePushSubscription.js';
+import { useCreatePointsReward } from '../hooks/usePointsRewards.js';
+import { useSetMealPlanRotationOrder } from '../hooks/useMealPlan.js';
+import { useCreateLaundryType } from '../hooks/useLaundry.js';
+import {
+  useSetWeeklyAllowance,
+  useSettings,
+  useUpdateCurrency,
+  useUpdateFeatureFlags,
+  useUpdateInterestRate,
+} from '../hooks/useTransactionActions.js';
+import { usePushSubscription, type PushSupportState } from '../pwa/usePushSubscription.js';
 import { STORAGE_CURRENCY } from '../utils/currency.js';
+import { FEATURE_TOGGLES, type FeatureFlags } from '../utils/featureFlags.js';
 import { ApiError } from '../services/api.js';
 import { Select } from '../components/Select.js';
 import { PermissionCheckboxes } from '../components/PermissionCheckboxes.js';
+import { GroupOrderEditor } from '../components/GroupOrderEditor.js';
+import { NotificationPreferences } from '../components/NotificationPreferences.js';
 import { FULL_PERMISSIONS, type PermissionValues } from '../utils/permissions.js';
 
 type Phase =
   | 'welcome'
   | 'currency'
+  | 'features'
   | 'child'
   | 'allowance'
   | 'chores'
+  | 'pointsRewards'
   | 'moreChildren'
   | 'parents'
+  | 'mealPlan'
+  | 'laundry'
   | 'interest'
   | 'push'
+  | 'notificationPrefs'
   | 'done';
 
 const SECTIONS: { label: string; phases: Phase[] }[] = [
   { label: 'Bienvenue', phases: ['welcome'] },
   { label: 'Devise', phases: ['currency'] },
-  { label: 'Enfants', phases: ['child', 'allowance', 'chores', 'moreChildren'] },
+  { label: 'Sections', phases: ['features'] },
+  { label: 'Enfants', phases: ['child', 'allowance', 'chores', 'pointsRewards', 'moreChildren'] },
   { label: 'Parents', phases: ['parents'] },
-  { label: 'Réglages', phases: ['interest', 'push'] },
+  { label: 'Maison', phases: ['mealPlan', 'laundry'] },
+  { label: 'Réglages', phases: ['interest', 'push', 'notificationPrefs'] },
   { label: 'Terminé', phases: ['done'] },
 ];
+
 
 function StepShell({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col gap-4">{children}</div>;
@@ -67,7 +89,7 @@ function ProgressDots({ phase }: { phase: Phase }) {
 function WelcomeStep({ onNext }: { onNext: () => void }) {
   return (
     <StepShell>
-      <h1 className="text-2xl font-bold">Bienvenue dans Banque Familiale 👋</h1>
+      <h1 className="text-2xl font-bold">Bienvenue dans FamilyApp 👋</h1>
       <p className="text-slate-600 dark:text-slate-400">
         En quelques étapes, on va configurer ensemble ta famille — devise, enfants, argent de poche,
         taux d'intérêt et notifications — pour qu'elle soit prête à l'emploi.
@@ -117,6 +139,72 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
         className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
       >
         {updateCurrency.isPending ? 'Enregistrement…' : 'Suivant'}
+      </button>
+    </StepShell>
+  );
+}
+
+function FeaturesStep({ onNext }: { onNext: (flags: FeatureFlags) => void }) {
+  const updateFeatureFlags = useUpdateFeatureFlags();
+  const [flags, setFlags] = useState<FeatureFlags>({
+    stocksEnabled: false,
+    mealPlanEnabled: false,
+    shoppingListEnabled: false,
+    laundryEnabled: false,
+  });
+
+  function toggle(key: keyof FeatureFlags) {
+    setFlags((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function onSubmit() {
+    updateFeatureFlags.mutate(flags, { onSuccess: () => onNext(flags) });
+  }
+
+  return (
+    <StepShell>
+      <h1 className="text-xl font-bold">Quelles sections activer ?</h1>
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        L'argent de poche et les tâches sont toujours actifs. Le reste est optionnel — active ce
+        qui t'intéresse, modifiable à tout moment depuis les Paramètres.
+      </p>
+      <div className="flex flex-col gap-2">
+        {FEATURE_TOGGLES.map((toggleDef) => {
+          const isOn = flags[toggleDef.key];
+          return (
+            <button
+              key={toggleDef.key}
+              type="button"
+              onClick={() => toggle(toggleDef.key)}
+              className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
+                isOn
+                  ? 'border-brand-400 bg-brand-50 dark:border-brand-700 dark:bg-brand-900/30'
+                  : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950'
+              }`}
+            >
+              <span aria-hidden className="text-xl">{toggleDef.icon}</span>
+              <span className="flex-1">
+                <span className="block font-medium">{toggleDef.label}</span>
+                <span className="block text-sm text-slate-500 dark:text-slate-400">{toggleDef.description}</span>
+              </span>
+              <span
+                className={`h-6 w-11 shrink-0 rounded-full transition-colors ${isOn ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+              >
+                <span
+                  className={`block h-5 w-5 translate-y-0.5 rounded-full bg-white shadow transition-transform ${isOn ? 'translate-x-5' : 'translate-x-0.5'}`}
+                />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={updateFeatureFlags.isPending}
+        className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+      >
+        {updateFeatureFlags.isPending ? 'Enregistrement…' : 'Suivant'}
       </button>
     </StepShell>
   );
@@ -365,6 +453,163 @@ function ChoresStep({
   );
 }
 
+function PointsRewardsStep({
+  childUserId,
+  childFirstName,
+  onNext,
+}: {
+  childUserId: string | null;
+  childFirstName: string;
+  onNext: () => void;
+}) {
+  const createReward = useCreatePointsReward();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [custom, setCustom] = useState<{ title: string; pointsRequired: number }[]>([]);
+  const [customTitle, setCustomTitle] = useState('');
+  const [customPoints, setCustomPoints] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function toggle(title: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  }
+
+  function addCustom() {
+    const points = Number(customPoints);
+    if (!customTitle.trim() || !Number.isInteger(points) || points <= 0) return;
+    setCustom((prev) => [...prev, { title: customTitle.trim(), pointsRequired: points }]);
+    setCustomTitle('');
+    setCustomPoints('');
+  }
+
+  function removeCustom(index: number) {
+    setCustom((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function onSubmit() {
+    if (!childUserId || (selected.size === 0 && custom.length === 0)) return onNext();
+    setIsSubmitting(true);
+    try {
+      for (const template of POINTS_REWARD_TEMPLATES) {
+        if (!selected.has(template.title)) continue;
+        await createReward.mutateAsync({
+          childUserId,
+          title: template.title,
+          pointsRequired: template.pointsRequired,
+        });
+      }
+      for (const reward of custom) {
+        await createReward.mutateAsync({ childUserId, title: reward.title, pointsRequired: reward.pointsRequired });
+      }
+      onNext();
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const hasAny = selected.size > 0 || custom.length > 0;
+
+  return (
+    <StepShell>
+      <h1 className="text-xl font-bold">Récompenses en points pour {childFirstName} ?</h1>
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Optionnel — coche ce que tu veux proposer, ou invente les tiennes, {childFirstName} pourra
+        les débloquer avec ses points de corvées. Modifiable à tout moment depuis Maison.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {POINTS_REWARD_TEMPLATES.map((template) => {
+          const isSelected = selected.has(template.title);
+          return (
+            <button
+              key={template.title}
+              type="button"
+              onClick={() => toggle(template.title)}
+              className={
+                isSelected
+                  ? 'rounded-full bg-brand-600 px-3 py-1.5 text-sm font-medium text-white'
+                  : 'rounded-full border border-slate-300 px-3 py-1.5 text-sm hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700 dark:hover:border-brand-700 dark:hover:bg-brand-900/30'
+              }
+            >
+              {template.title} ({template.pointsRequired} pts)
+            </button>
+          );
+        })}
+      </div>
+
+      {custom.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {custom.map((reward, index) => (
+            <li
+              key={`${reward.title}-${index}`}
+              className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+            >
+              {reward.title} ({reward.pointsRequired} pts)
+              <button
+                type="button"
+                onClick={() => removeCustom(index)}
+                aria-label={`Retirer ${reward.title}`}
+                className="text-amber-500 hover:text-amber-800 dark:hover:text-amber-200"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <input
+          type="text"
+          value={customTitle}
+          onChange={(e) => setCustomTitle(e.target.value)}
+          placeholder="Ex. Choisir le dessert"
+          className="min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+        />
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={customPoints}
+          onChange={(e) => setCustomPoints(e.target.value)}
+          placeholder="Points"
+          className="w-24 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+        />
+        <button
+          type="button"
+          onClick={addCustom}
+          className="rounded-full border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+        >
+          + Ajouter
+        </button>
+      </div>
+
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={isSubmitting}
+          className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          {isSubmitting ? 'Ajout…' : hasAny ? 'Ajouter et continuer' : 'Suivant'}
+        </button>
+        {hasAny && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="text-sm text-slate-500 hover:underline dark:text-slate-400"
+          >
+            Passer
+          </button>
+        )}
+      </div>
+    </StepShell>
+  );
+}
+
 function MoreChildrenStep({ onAddAnother, onDone }: { onAddAnother: () => void; onDone: () => void }) {
   return (
     <StepShell>
@@ -545,6 +790,128 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
   );
 }
 
+function MealPlanStep({ onNext }: { onNext: () => void }) {
+  const members = useHouseholdRoster();
+  const setRotationOrder = useSetMealPlanRotationOrder();
+  const [groups, setGroups] = useState<string[][] | null>(null);
+
+  const activeMembers = (members.data ?? []).filter((m) => m.isActive);
+  const defaultGroups = activeMembers.map((m) => [m.id]);
+  const currentGroups = groups ?? defaultGroups;
+
+  if (!members.data) return null;
+
+  function onSubmit() {
+    if (currentGroups.length === 0) return onNext();
+    setRotationOrder.mutate({ orderedGroups: currentGroups }, { onSuccess: onNext });
+  }
+
+  return (
+    <StepShell>
+      <h1 className="text-xl font-bold">Qui cuisine ?</h1>
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Un tour par personne a été préparé — retire quelqu'un, ou regroupe deux personnes pour
+        qu'elles cuisinent ensemble à leur tour. Modifiable à tout moment depuis Maison.
+      </p>
+      <GroupOrderEditor members={activeMembers} groups={currentGroups} onChange={setGroups} />
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={setRotationOrder.isPending}
+          className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          {setRotationOrder.isPending ? 'Enregistrement…' : 'Suivant'}
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          className="text-sm text-slate-500 hover:underline dark:text-slate-400"
+        >
+          Passer
+        </button>
+      </div>
+    </StepShell>
+  );
+}
+
+function LaundryStep({ onNext }: { onNext: () => void }) {
+  const members = useHouseholdRoster();
+  const createType = useCreateLaundryType();
+  const [name, setName] = useState('Lessive');
+  const [weekday, setWeekday] = useState('0');
+  const [groups, setGroups] = useState<string[][] | null>(null);
+
+  const activeMembers = (members.data ?? []).filter((m) => m.isActive);
+  const defaultGroups = activeMembers.map((m) => [m.id]);
+  const currentGroups = groups ?? defaultGroups;
+
+  if (!members.data) return null;
+
+  function onSubmit() {
+    if (!name.trim() || currentGroups.length === 0) return onNext();
+    createType.mutate(
+      {
+        name: name.trim(),
+        mode: 'ROTATING',
+        rotationGroups: currentGroups,
+        scheduleType: 'WEEKLY',
+        weekdays: [Number(weekday)],
+      },
+      { onSuccess: onNext },
+    );
+  }
+
+  return (
+    <StepShell>
+      <h1 className="text-xl font-bold">Un type de linge pour démarrer ?</h1>
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Optionnel — un exemple pour commencer, chaque semaine. Tu pourras en ajouter d'autres et
+        tout ajuster depuis Maison.
+      </p>
+      <label className="text-sm font-medium" htmlFor="laundry-name">
+        Nom
+      </label>
+      <input
+        id="laundry-name"
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+      />
+      <label className="text-sm font-medium" htmlFor="laundry-weekday">
+        Jour de la semaine
+      </label>
+      <Select
+        id="laundry-weekday"
+        value={weekday}
+        onChange={setWeekday}
+        options={WEEKDAY_LABELS.map((label, i) => ({ value: String(i), label }))}
+      />
+      <GroupOrderEditor members={activeMembers} groups={currentGroups} onChange={setGroups} />
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={createType.isPending}
+          className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          {createType.isPending ? 'Enregistrement…' : name.trim() ? 'Ajouter et continuer' : 'Suivant'}
+        </button>
+        {name.trim() && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="text-sm text-slate-500 hover:underline dark:text-slate-400"
+          >
+            Passer
+          </button>
+        )}
+      </div>
+    </StepShell>
+  );
+}
+
 const interestFormSchema = z.object({
   ratePercent: z.coerce.number().min(0, 'Ne peut pas être négatif').max(100, 'Maximum 100%'),
 });
@@ -594,8 +961,44 @@ function InterestStep({ onNext }: { onNext: () => void }) {
   );
 }
 
-function PushStep({ onNext }: { onNext: () => void }) {
-  const push = usePushSubscription();
+function NotificationPrefsStep({
+  pushState,
+  onNext,
+}: {
+  pushState: PushSupportState;
+  onNext: () => void;
+}) {
+  return (
+    <StepShell>
+      <h1 className="text-xl font-bold">Tes notifications</h1>
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Tout est activé par défaut — décoche ce que tu ne veux pas recevoir. Modifiable à tout
+        moment depuis les Paramètres.
+      </p>
+      <NotificationPreferences pushState={pushState} />
+      <button
+        type="button"
+        onClick={onNext}
+        className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+      >
+        Suivant
+      </button>
+    </StepShell>
+  );
+}
+
+function PushStep({ push, onNext }: { push: ReturnType<typeof usePushSubscription>; onNext: () => void }) {
+  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  async function onActivate() {
+    setIsSubscribing(true);
+    try {
+      await push.subscribe();
+      onNext();
+    } finally {
+      setIsSubscribing(false);
+    }
+  }
 
   return (
     <StepShell>
@@ -608,10 +1011,15 @@ function PushStep({ onNext }: { onNext: () => void }) {
         {(push.state === 'unsubscribed' || push.state === 'subscribed') && (
           <button
             type="button"
-            onClick={() => (push.state === 'subscribed' ? undefined : push.subscribe())}
-            className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+            onClick={() => (push.state === 'subscribed' ? onNext() : onActivate())}
+            disabled={isSubscribing}
+            className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
           >
-            {push.state === 'subscribed' ? '✅ Notifications activées' : '🔔 Activer sur cet appareil'}
+            {push.state === 'subscribed'
+              ? '✅ Notifications activées'
+              : isSubscribing
+                ? 'Activation…'
+                : '🔔 Activer sur cet appareil'}
           </button>
         )}
         {push.state === 'denied' && (
@@ -656,25 +1064,103 @@ function DoneStep({ onFinish, isPending }: { onFinish: () => void; isPending: bo
   );
 }
 
+const ONBOARDING_STORAGE_KEY = 'onboarding-wizard-progress';
+
+type OnboardingProgress = {
+  phase: Phase;
+  history: Phase[];
+  childUserId: string | null;
+  childCount: number;
+  featureFlags: FeatureFlags;
+};
+
+const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
+  stocksEnabled: false,
+  mealPlanEnabled: false,
+  shoppingListEnabled: false,
+  laundryEnabled: false,
+};
+
+function loadOnboardingProgress(): OnboardingProgress | null {
+  try {
+    const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as OnboardingProgress) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function OnboardingWizard() {
   const navigate = useNavigate();
-  const [phase, setPhase] = useState<Phase>('welcome');
-  const [childUserId, setChildUserId] = useState<string | null>(null);
-  const [childCount, setChildCount] = useState(0);
+  // Resuming mid-onboarding after e.g. a browser-back into the login screen (and back in) must
+  // not restart from scratch — that previously re-ran AddChildStep and created a duplicate
+  // child. Progress is restored from localStorage on mount instead of always starting at
+  // 'welcome'.
+  const [phase, setPhaseRaw] = useState<Phase>(() => loadOnboardingProgress()?.phase ?? 'welcome');
+  const [history, setHistory] = useState<Phase[]>(() => loadOnboardingProgress()?.history ?? []);
+  const [childUserId, setChildUserId] = useState<string | null>(() => loadOnboardingProgress()?.childUserId ?? null);
+  const [childCount, setChildCount] = useState(() => loadOnboardingProgress()?.childCount ?? 0);
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(
+    () => loadOnboardingProgress()?.featureFlags ?? DEFAULT_FEATURE_FLAGS,
+  );
   const overview = useParentOverview(phase === 'allowance');
   const completeOnboarding = useCompleteOnboarding();
+  const push = usePushSubscription();
+
+  useEffect(() => {
+    const progress: OnboardingProgress = { phase, history, childUserId, childCount, featureFlags };
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(progress));
+  }, [phase, history, childUserId, childCount, featureFlags]);
+
+  function goTo(next: Phase) {
+    setHistory((h) => [...h, phase]);
+    setPhaseRaw(next);
+  }
+
+  function goBack() {
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      setPhaseRaw(h[h.length - 1]!);
+      return h.slice(0, -1);
+    });
+  }
 
   const child = overview.data?.children.find((c) => c.userId === childUserId);
   const childAccountId = child?.accountId ?? null;
   const childFirstName = child?.firstName ?? '';
 
   function finish() {
-    completeOnboarding.mutate(undefined, { onSuccess: () => navigate('/dashboard', { replace: true }) });
+    completeOnboarding.mutate(undefined, {
+      onSuccess: () => {
+        localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+        navigate('/dashboard', { replace: true });
+      },
+    });
+  }
+
+  function afterParents() {
+    if (featureFlags.mealPlanEnabled) return goTo('mealPlan');
+    if (featureFlags.laundryEnabled) return goTo('laundry');
+    return goTo('interest');
+  }
+
+  function afterMealPlan() {
+    if (featureFlags.laundryEnabled) return goTo('laundry');
+    return goTo('interest');
   }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-10">
       <ProgressDots phase={phase} />
+      {history.length > 0 && phase !== 'done' && (
+        <button
+          type="button"
+          onClick={goBack}
+          className="-mb-4 self-start text-sm text-slate-500 hover:underline dark:text-slate-400"
+        >
+          ← Retour
+        </button>
+      )}
       <AnimatePresence mode="wait">
         <motion.div
           key={phase}
@@ -682,15 +1168,23 @@ export function OnboardingWizard() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
         >
-          {phase === 'welcome' && <WelcomeStep onNext={() => setPhase('currency')} />}
-          {phase === 'currency' && <CurrencyStep onNext={() => setPhase('child')} />}
+          {phase === 'welcome' && <WelcomeStep onNext={() => goTo('currency')} />}
+          {phase === 'currency' && <CurrencyStep onNext={() => goTo('features')} />}
+          {phase === 'features' && (
+            <FeaturesStep
+              onNext={(flags) => {
+                setFeatureFlags(flags);
+                goTo('child');
+              }}
+            />
+          )}
           {phase === 'child' && (
             <AddChildStep
               isFirst={childCount === 0}
               onNext={(id) => {
                 setChildUserId(id);
                 setChildCount((n) => n + 1);
-                setPhase('allowance');
+                goTo('allowance');
               }}
             />
           )}
@@ -698,22 +1192,34 @@ export function OnboardingWizard() {
             <AllowanceStep
               accountId={childAccountId}
               childFirstName={childFirstName}
-              onNext={() => setPhase('chores')}
+              onNext={() => goTo('chores')}
             />
           )}
           {phase === 'chores' && (
             <ChoresStep
               childUserId={childUserId}
               childFirstName={childFirstName}
-              onNext={() => setPhase('moreChildren')}
+              onNext={() => goTo('pointsRewards')}
+            />
+          )}
+          {phase === 'pointsRewards' && (
+            <PointsRewardsStep
+              childUserId={childUserId}
+              childFirstName={childFirstName}
+              onNext={() => goTo('moreChildren')}
             />
           )}
           {phase === 'moreChildren' && (
-            <MoreChildrenStep onAddAnother={() => setPhase('child')} onDone={() => setPhase('parents')} />
+            <MoreChildrenStep onAddAnother={() => goTo('child')} onDone={() => goTo('parents')} />
           )}
-          {phase === 'parents' && <AddParentsStep onNext={() => setPhase('interest')} />}
-          {phase === 'interest' && <InterestStep onNext={() => setPhase('push')} />}
-          {phase === 'push' && <PushStep onNext={() => setPhase('done')} />}
+          {phase === 'parents' && <AddParentsStep onNext={afterParents} />}
+          {phase === 'mealPlan' && <MealPlanStep onNext={afterMealPlan} />}
+          {phase === 'laundry' && <LaundryStep onNext={() => goTo('interest')} />}
+          {phase === 'interest' && <InterestStep onNext={() => goTo('push')} />}
+          {phase === 'push' && <PushStep push={push} onNext={() => goTo('notificationPrefs')} />}
+          {phase === 'notificationPrefs' && (
+            <NotificationPrefsStep pushState={push.state} onNext={() => goTo('done')} />
+          )}
           {phase === 'done' && <DoneStep onFinish={finish} isPending={completeOnboarding.isPending} />}
         </motion.div>
       </AnimatePresence>

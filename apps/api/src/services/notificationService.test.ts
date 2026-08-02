@@ -101,4 +101,43 @@ describe('notificationService (seeded demo family)', () => {
     await service.deleteAllForUser('demo-elodie');
     expect(await service.listMine('demo-elodie')).toHaveLength(0);
   });
+
+  it('respects a disabled category preference, but never filters an unfilterable type like a credential reset', async () => {
+    await service.setPreference('demo-papa', 'MONEY_REQUESTS', false);
+
+    const papaBefore = await service.listMine('demo-papa');
+
+    await service.notifyParentsOfRequest({
+      familyId: 'demo-family',
+      requesterFirstName: 'Elodie',
+      amountCents: 500,
+      moneyRequestId: 'req-pref-1',
+      isWithdrawal: false,
+    });
+
+    expect(await service.listMine('demo-papa')).toHaveLength(papaBefore.length);
+    const mamanNotifs = await service.listMine('demo-maman');
+    expect(mamanNotifs.some((n) => n.type === 'MONEY_REQUEST_CREATED')).toBe(true);
+
+    // CREDENTIAL_RESET_REQUESTED has no category — always sent regardless of preferences.
+    await service.notifyParentsOfCredentialResetRequest({
+      familyId: 'demo-family',
+      requesterFirstName: 'Matthieu',
+    });
+    const papaNotifs = await service.listMine('demo-papa');
+    expect(papaNotifs.some((n) => n.type === 'CREDENTIAL_RESET_REQUESTED')).toBe(true);
+
+    await service.setPreference('demo-papa', 'MONEY_REQUESTS', true);
+  });
+
+  it('exposes all 8 categories as enabled by default, reflecting an explicit override', async () => {
+    const before = await service.listPreferences('demo-damien');
+    expect(before).toHaveLength(8);
+    expect(before.every((p) => p.enabled)).toBe(true);
+
+    await service.setPreference('demo-damien', 'LAUNDRY', false);
+    const after = await service.listPreferences('demo-damien');
+    expect(after.find((p) => p.category === 'LAUNDRY')?.enabled).toBe(false);
+    expect(after.filter((p) => p.category !== 'LAUNDRY').every((p) => p.enabled)).toBe(true);
+  });
 });

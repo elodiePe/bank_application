@@ -58,6 +58,7 @@ export function createMemberController(memberService: MemberService) {
         familyId: req.familyOwner!.familyId,
         firstName: parsed.data.firstName,
         pin: parsed.data.pin,
+        ownerEmail: req.familyOwner!.ownerEmail,
       });
       res.status(201).json(member);
     },

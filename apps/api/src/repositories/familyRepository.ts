@@ -26,7 +26,16 @@ export function createFamilyRepository(prisma: PrismaClient) {
           name: params.name,
           ownerEmail: params.ownerEmail,
           ownerPasswordHash: params.ownerPasswordHash,
-          settings: { create: { defaultInterestRateBps: 240, currency: 'CHF' } },
+          settings: {
+            create: {
+              defaultInterestRateBps: 240,
+              currency: 'CHF',
+              stocksEnabled: false,
+              mealPlanEnabled: false,
+              shoppingListEnabled: false,
+              laundryEnabled: false,
+            },
+          },
         },
       });
     },
@@ -71,10 +80,25 @@ export function createFamilyRepository(prisma: PrismaClient) {
       });
     },
 
-    /// Cascades through every relation (users, accounts, transactions, requests,
-    /// notifications, audit logs, ...) via the schema's onDelete: Cascade chain.
+    /// Most family data cascades automatically via onDelete: Cascade chains rooted at
+    /// User/ChildAccount (transactions, requests, notifications, audit logs, chores, custom
+    /// notifications, shopping list, ...). But a handful of models scope themselves to a
+    /// family with a loose `familyId` field and no actual foreign key — see their own model
+    /// comments in schema.prisma — so Postgres has nothing to cascade through for them. Left
+    /// alone, deleting the family would leave these as permanent orphaned rows pointing at a
+    /// familyId that no longer exists. They're removed explicitly, in the same transaction as
+    /// the family delete itself.
     delete(id: string) {
-      return prisma.family.delete({ where: { id } });
+      return prisma.$transaction(async (tx) => {
+        await tx.pointsRewardGoal.deleteMany({ where: { familyId: id } });
+        await tx.mealPlanSlot.deleteMany({ where: { familyId: id } });
+        await tx.mealPlanRotationOrder.deleteMany({ where: { familyId: id } });
+        await tx.mealPlanChoreConfig.deleteMany({ where: { familyId: id } });
+        await tx.mealPlanOccurrenceStatus.deleteMany({ where: { familyId: id } });
+        await tx.laundryType.deleteMany({ where: { familyId: id } });
+        await tx.laundryOccurrenceStatus.deleteMany({ where: { familyId: id } });
+        return tx.family.delete({ where: { id } });
+      });
     },
   };
 }

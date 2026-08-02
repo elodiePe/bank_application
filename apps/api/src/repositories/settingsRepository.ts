@@ -13,6 +13,18 @@ export function createSettingsRepository(prisma: Db) {
     updateCurrency(familyId: string, currency: string) {
       return prisma.settings.update({ where: { familyId }, data: { currency } });
     },
+
+    updateFeatureFlags(
+      familyId: string,
+      data: {
+        stocksEnabled?: boolean;
+        mealPlanEnabled?: boolean;
+        shoppingListEnabled?: boolean;
+        laundryEnabled?: boolean;
+      },
+    ) {
+      return prisma.settings.update({ where: { familyId }, data });
+    },
   };
 }
 

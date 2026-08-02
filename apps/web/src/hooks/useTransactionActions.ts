@@ -5,6 +5,7 @@ import type {
   DepositInput,
   InterestRateInput,
   TransferInput,
+  UpdateFeatureFlagsInput,
   WeeklyAllowanceInput,
 } from '@banque-familiale/shared';
 import {
@@ -14,6 +15,7 @@ import {
   setWeeklyAllowance,
   transfer,
   updateCurrency,
+  updateFeatureFlags,
   updateInterestRate,
   withdrawal,
 } from '../services/transactionActions.service.js';
@@ -72,6 +74,14 @@ export function useUpdateCurrency() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CurrencyInput) => updateCurrency(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
+  });
+}
+
+export function useUpdateFeatureFlags() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateFeatureFlagsInput) => updateFeatureFlags(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
   });
 }

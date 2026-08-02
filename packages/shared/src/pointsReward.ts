@@ -11,6 +11,15 @@ export interface PointsRewardSummary {
   pointsRequired: number;
 }
 
+/** Suggested starter ladder offered during onboarding — a parent can pick some, all, or none,
+ * and refine amounts later from Maison like any other reward. */
+export const POINTS_REWARD_TEMPLATES: { title: string; pointsRequired: number }[] = [
+  { title: 'Choisir le dessert', pointsRequired: 50 },
+  { title: 'Un petit plaisir', pointsRequired: 100 },
+  { title: 'Sortie au choix', pointsRequired: 250 },
+  { title: 'Cadeau surprise', pointsRequired: 500 },
+];
+
 export const createPointsRewardSchema = z.object({
   childUserId: z.string().min(1),
   title: z.string().trim().min(1, 'Le nom est requis').max(60),

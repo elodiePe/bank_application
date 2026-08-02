@@ -112,7 +112,7 @@ export function createLaundryService(prisma: PrismaClient) {
 
   async function assertOwnedByFamily(id: string, familyId: string): Promise<LaundryType> {
     const type = await repo.findById(id);
-    if (!type || type.familyId !== familyId) throw new NotFoundError('Type de lessive introuvable');
+    if (!type || type.familyId !== familyId) throw new NotFoundError('Type de ménage introuvable');
     return type;
   }
 
@@ -123,11 +123,11 @@ export function createLaundryService(prisma: PrismaClient) {
     },
 
     /** Rolling window starting today, mirroring meal plan's listUpcoming — every (type, date)
-     * pair due within the window, resolved to who's on it. Overlays each occurrence's personal
-     * done/postponed status: a postponed occurrence's original assignees carry over to
+     * pair due within the window, resolved to who's on it. A postponed occurrence never shows
+     * at its original date (it's dropped from the result entirely there) — only once, at
      * whichever date it was pushed to (merged into that date's occurrence for the same type if
-     * one already exists there, otherwise added as its own occurrence), and the original
-     * occurrence is flagged `postponedTo`. */
+     * one already exists there, otherwise added as its own occurrence), flagged
+     * `postponedFrom` so the UI can say where it came from without showing it twice. */
     async listUpcoming(familyId: string, days: number): Promise<LaundryOccurrenceSummary[]> {
       const today = getStartOfDay(new Date());
       const rangeEnd = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
@@ -139,14 +139,15 @@ export function createLaundryService(prisma: PrismaClient) {
       const typesById = new Map(types.map((t) => [t.id, t]));
 
       const statusByKey = new Map(statuses.map((s) => [`${s.laundryTypeId}|${s.date.toISOString().slice(0, 10)}`, s]));
-      const incomingByKey = new Map<string, { userIds: string[]; firstNames: string[] }>();
+      const incomingByKey = new Map<string, { userIds: string[]; firstNames: string[]; fromDate: string }>();
       for (const status of statuses) {
         if (!status.postponedToDate) continue;
         const type = typesById.get(status.laundryTypeId);
         if (!type) continue;
+        const fromDateKey = status.date.toISOString().slice(0, 10);
         const originAssignees = computeAssignees(type, status.date);
         const targetKey = `${status.laundryTypeId}|${status.postponedToDate.toISOString().slice(0, 10)}`;
-        const bucket = incomingByKey.get(targetKey) ?? { userIds: [], firstNames: [] };
+        const bucket = incomingByKey.get(targetKey) ?? { userIds: [], firstNames: [], fromDate: fromDateKey };
         originAssignees.forEach((id) => {
           if (!bucket.userIds.includes(id)) {
             bucket.userIds.push(id);
@@ -166,6 +167,8 @@ export function createLaundryService(prisma: PrismaClient) {
           if (!isDueOn(type, date, weekday)) continue;
           const key = `${type.id}|${dateKey}`;
           const status = statusByKey.get(key);
+          // Postponed away from here — this occurrence now lives only at its destination date.
+          if (status?.postponedToDate) continue;
           const incoming = incomingByKey.get(key);
 
           let assignedUserIds = computeAssignees(type, date);
@@ -188,7 +191,7 @@ export function createLaundryService(prisma: PrismaClient) {
             assignedUserIds,
             assignedFirstNames,
             done: status?.done ?? false,
-            postponedTo: status?.postponedToDate ? status.postponedToDate.toISOString().slice(0, 10) : null,
+            postponedFrom: incoming?.fromDate ?? null,
           });
         }
       }
@@ -210,7 +213,7 @@ export function createLaundryService(prisma: PrismaClient) {
           assignedUserIds: incoming.userIds,
           assignedFirstNames: incoming.firstNames,
           done: false,
-          postponedTo: null,
+          postponedFrom: incoming.fromDate,
         });
       }
 
@@ -327,7 +330,7 @@ export function createLaundryService(prisma: PrismaClient) {
       const types = await repo.listForFamily(params.familyId);
       const validIds = new Set(types.map((t) => t.id));
       for (const id of params.orderedIds) {
-        if (!validIds.has(id)) throw new ValidationError('Type de lessive invalide');
+        if (!validIds.has(id)) throw new ValidationError('Type de ménage invalide');
       }
       await repo.reorder(params.familyId, params.orderedIds);
     },
@@ -376,12 +379,13 @@ export function createLaundryService(prisma: PrismaClient) {
           await choreService.createChore({
             familyId: type.familyId,
             childUserId: userId,
-            title: `Lessive : ${type.name}`,
+            title: `Ménage : ${type.name}`,
             rewardType: type.choreRewardType ?? 'POINTS',
             rewardCents: type.choreRewardCents ?? undefined,
             rewardPoints: type.choreRewardPoints ?? undefined,
             recurrence: 'ONCE',
             requiresApproval: type.choreRequiresApproval,
+            autoGenerated: true,
           });
           anyCreated = true;
         }

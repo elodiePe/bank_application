@@ -4,16 +4,19 @@ import { useParentMode } from '../hooks/useParentMode.js';
 import { useParentOverview } from '../hooks/useDashboard.js';
 import { useLogoutFamily } from '../hooks/useFamilyAuth.js';
 import { useTheme } from '../hooks/useTheme.js';
+import { usePushSubscription } from '../pwa/usePushSubscription.js';
 import { CollapsibleSection } from '../components/CollapsibleSection.js';
 import { InterestRateSettings } from '../components/InterestRateSettings.js';
 import { CurrencySettings } from '../components/CurrencySettings.js';
 import { WeeklyAllowanceSettings } from '../components/WeeklyAllowanceSettings.js';
 import { FamilyManagementPanel } from '../components/FamilyManagementPanel.js';
+import { FeatureFlagsSettings } from '../components/FeatureFlagsSettings.js';
 import { MyAccountSettings } from '../components/MyAccountSettings.js';
 import { PointsVisibilitySetting } from '../components/PointsVisibilitySetting.js';
 import { PushNotificationSettings } from '../components/PushNotificationSettings.js';
 import { DeleteFamilyPanel } from '../components/DeleteFamilyPanel.js';
 import { CustomNotifications } from '../components/CustomNotifications.js';
+import { NotificationPreferences } from '../components/NotificationPreferences.js';
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -27,6 +30,7 @@ export function SettingsPage() {
   const isTeen = user?.interfaceLevel === 'TEEN';
   const canToggleManagementMode = isParent || isTeen;
   const { parentModeEnabled, toggleParentMode } = useParentMode();
+  const push = usePushSubscription();
 
   return (
     <div className="space-y-4">
@@ -52,7 +56,7 @@ export function SettingsPage() {
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isParent
                   ? 'Affiche les outils de gestion (validation, planning, famille…) au lieu d\'une vue simple utilisateur.'
-                  : 'Affiche les outils pour modifier le planning des repas et de la lessive.'}
+                  : 'Affiche les outils pour modifier le planning des repas et du ménage.'}
               </p>
             </div>
             <button
@@ -80,6 +84,7 @@ export function SettingsPage() {
             </button>
           </div>
         )}
+        {isTeen && <PointsVisibilitySetting />}
       </CollapsibleSection>
 
       {isParent && canManageSettings && (
@@ -90,22 +95,26 @@ export function SettingsPage() {
         </CollapsibleSection>
       )}
 
+      {isParent && canManageSettings && (
+        <CollapsibleSection title="Sections">
+          <FeatureFlagsSettings />
+        </CollapsibleSection>
+      )}
+
       {isParent && canManageFamily && (
         <CollapsibleSection title="Famille">
           <FamilyManagementPanel />
         </CollapsibleSection>
       )}
 
-      {isParent && (
-        <CollapsibleSection title="Notifications">
-          <CustomNotifications />
-        </CollapsibleSection>
-      )}
+      <CollapsibleSection title="Notifications">
+        <PushNotificationSettings push={push} />
+        <NotificationPreferences pushState={push.state} />
+        {isParent && <CustomNotifications />}
+      </CollapsibleSection>
 
       <CollapsibleSection title="Mon compte">
         <MyAccountSettings />
-        {isTeen && <PointsVisibilitySetting />}
-        <PushNotificationSettings />
       </CollapsibleSection>
 
       {isParent && (

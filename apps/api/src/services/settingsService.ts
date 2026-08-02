@@ -3,8 +3,22 @@ import type { PrismaClient } from '@prisma/client';
 import { createSettingsRepository } from '../repositories/settingsRepository.js';
 import { createAuditLogRepository } from '../repositories/auditLogRepository.js';
 
-function toFamilySettings(s: { defaultInterestRateBps: number; currency: string }): FamilySettings {
-  return { defaultInterestRateBps: s.defaultInterestRateBps, currency: s.currency };
+function toFamilySettings(s: {
+  defaultInterestRateBps: number;
+  currency: string;
+  stocksEnabled: boolean;
+  mealPlanEnabled: boolean;
+  shoppingListEnabled: boolean;
+  laundryEnabled: boolean;
+}): FamilySettings {
+  return {
+    defaultInterestRateBps: s.defaultInterestRateBps,
+    currency: s.currency,
+    stocksEnabled: s.stocksEnabled,
+    mealPlanEnabled: s.mealPlanEnabled,
+    shoppingListEnabled: s.shoppingListEnabled,
+    laundryEnabled: s.laundryEnabled,
+  };
 }
 
 export function createSettingsService(prisma: PrismaClient) {
@@ -48,6 +62,33 @@ export function createSettingsService(prisma: PrismaClient) {
           entityType: 'Settings',
           entityId: updated.id,
           metadata: { newCurrency: params.currency },
+        });
+
+        return toFamilySettings(updated);
+      });
+    },
+
+    async updateFeatureFlags(params: {
+      familyId: string;
+      actorId: string;
+      flags: {
+        stocksEnabled?: boolean;
+        mealPlanEnabled?: boolean;
+        shoppingListEnabled?: boolean;
+        laundryEnabled?: boolean;
+      };
+    }): Promise<FamilySettings> {
+      return prisma.$transaction(async (tx) => {
+        const settingsRepo = createSettingsRepository(tx);
+        const auditLogRepo = createAuditLogRepository(tx);
+
+        const updated = await settingsRepo.updateFeatureFlags(params.familyId, params.flags);
+        await auditLogRepo.record({
+          actorId: params.actorId,
+          action: 'FEATURE_FLAGS_UPDATED',
+          entityType: 'Settings',
+          entityId: updated.id,
+          metadata: params.flags,
         });
 
         return toFamilySettings(updated);

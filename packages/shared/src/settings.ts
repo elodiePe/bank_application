@@ -3,7 +3,24 @@ import { z } from 'zod';
 export interface FamilySettings {
   defaultInterestRateBps: number;
   currency: string;
+  stocksEnabled: boolean;
+  mealPlanEnabled: boolean;
+  shoppingListEnabled: boolean;
+  laundryEnabled: boolean;
 }
+
+/** Off by default for a new family — a parent turns on whichever of these sections they
+ * actually want, during onboarding or later from Paramètres. Partial: a caller only sends the
+ * toggles it's actually changing. */
+export const updateFeatureFlagsSchema = z
+  .object({
+    stocksEnabled: z.boolean().optional(),
+    mealPlanEnabled: z.boolean().optional(),
+    shoppingListEnabled: z.boolean().optional(),
+    laundryEnabled: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, { message: 'Au moins une option requise' });
+export type UpdateFeatureFlagsInput = z.infer<typeof updateFeatureFlagsSchema>;
 
 /** Display-only — amounts stay stored as integer cents; switching currency just changes
  * the symbol/format used to render them, it never converts existing balances. */

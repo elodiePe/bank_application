@@ -123,7 +123,7 @@ function EditGoalModal({
 export function SavingsGoalCard({ balanceCents }: { balanceCents: number }) {
   const goal = useMySavingsGoal();
   const deleteGoal = useDeleteSavingsGoal();
-  const { currency, rate } = useFxRate();
+  const { currency, rate, rateLoading } = useFxRate();
   const [editOpen, setEditOpen] = useState(false);
 
   if (goal.isLoading) return null;
@@ -192,14 +192,17 @@ export function SavingsGoalCard({ balanceCents }: { balanceCents: number }) {
           </div>
 
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {formatMoney(convertCents(balanceCents, rate), currency)} sur{' '}
-            {formatMoney(convertCents(targetCents, rate), currency)}
+            {rateLoading
+              ? '…'
+              : `${formatMoney(convertCents(balanceCents, rate), currency)} sur ${formatMoney(convertCents(targetCents, rate), currency)}`}
           </p>
 
           <p className="mt-1 text-sm font-medium">
-            {reached
-              ? '🎉 Objectif atteint !'
-              : `Il te manque ${formatMoney(convertCents(remainingCents, rate), currency)}`}
+            {rateLoading
+              ? '…'
+              : reached
+                ? '🎉 Objectif atteint !'
+                : `Il te manque ${formatMoney(convertCents(remainingCents, rate), currency)}`}
           </p>
         </div>
       </motion.div>

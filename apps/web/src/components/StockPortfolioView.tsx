@@ -119,7 +119,10 @@ export function StockPortfolioView() {
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">
-                    {h.symbol}{' '}
+                    {h.symbol}
+                    {/* Desktop already shows the share count in the subtitle line below — this
+                        is only needed on mobile, where that line drops it for space. */}
+                    <span className="sm:hidden"> ({h.quantity})</span>{' '}
                     <span className="text-sm font-normal text-slate-500 dark:text-slate-400">{h.companyName}</span>
                   </p>
                   <p className="text-sm text-slate-500 dark:text-slate-400">

@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { currencySchema, interestRateSchema } from '@banque-familiale/shared';
+import { currencySchema, interestRateSchema, updateFeatureFlagsSchema } from '@banque-familiale/shared';
 import type { SettingsService } from '../services/settingsService.js';
 import { ValidationError } from '../utils/errors.js';
 
@@ -30,6 +30,18 @@ export function createSettingsController(settingsService: SettingsService) {
         familyId: req.auth!.familyId,
         currency: parsed.data.currency,
         actorId: req.auth!.sub,
+      });
+      res.json(settings);
+    },
+
+    async updateFeatureFlags(req: Request, res: Response) {
+      const parsed = updateFeatureFlagsSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+      const settings = await settingsService.updateFeatureFlags({
+        familyId: req.auth!.familyId,
+        actorId: req.auth!.sub,
+        flags: parsed.data,
       });
       res.json(settings);
     },

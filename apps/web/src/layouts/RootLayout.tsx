@@ -9,7 +9,7 @@ import { NotificationBell } from '../components/NotificationBell.js';
 import { LogoutIcon } from '../components/icons.js';
 
 const NAV_SECTIONS = [
-  { to: '/home', label: 'Accueil' },
+  { to: '/home', label: 'Dashboard' },
   { to: '/dashboard', label: 'Argent' },
   { to: '/chores', label: 'Maison' },
   { to: '/settings', label: 'Paramètres' },
@@ -41,7 +41,7 @@ export function RootLayout() {
           to="/"
           className="truncate text-base font-semibold text-brand-600 sm:text-lg dark:text-brand-400"
         >
-          Banque Familiale
+          FamilyApp
         </Link>
         <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           {user && <NotificationBell />}

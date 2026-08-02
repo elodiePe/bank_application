@@ -5,6 +5,7 @@ import type {
   FamilySettings,
   InterestRateInput,
   TransferInput,
+  UpdateFeatureFlagsInput,
   WeeklyAllowanceInput,
   WithdrawalInput,
 } from '@banque-familiale/shared';
@@ -36,6 +37,10 @@ export function updateInterestRate(input: InterestRateInput): Promise<FamilySett
 
 export function updateCurrency(input: CurrencyInput): Promise<FamilySettings> {
   return apiPut<FamilySettings>('/settings/currency', input);
+}
+
+export function updateFeatureFlags(input: UpdateFeatureFlagsInput): Promise<FamilySettings> {
+  return apiPut<FamilySettings>('/settings/features', input);
 }
 
 export function setWeeklyAllowance(accountId: string, input: WeeklyAllowanceInput): Promise<void> {

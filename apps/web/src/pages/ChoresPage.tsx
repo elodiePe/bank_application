@@ -5,6 +5,7 @@ import { useCurrentUser } from '../hooks/useAuth.js';
 import { useParentMode } from '../hooks/useParentMode.js';
 import { useMyChores } from '../hooks/useChores.js';
 import { useParentOverview } from '../hooks/useDashboard.js';
+import { useSettings } from '../hooks/useTransactionActions.js';
 import { useWeeklyDuties, type DutyRow } from '../hooks/useWeeklyDuties.js';
 import { useMyPersonalTasks } from '../hooks/usePersonalTasks.js';
 import { ChoreSettings } from '../components/ChoreSettings.js';
@@ -69,28 +70,36 @@ const SUB_TAB_LABELS: Record<MaisonSubTab, string> = {
   chores: 'Tâches',
   meals: 'Repas',
   shopping: 'Courses',
-  laundry: 'Lessives',
+  laundry: 'Ménage',
 };
 const SUB_TAB_ORDER: MaisonSubTab[] = ['chores', 'meals', 'shopping', 'laundry'];
 
 /** Sub-tab lives in the URL (?tab=meals) so it can be reached directly from Accueil's
  * shortcuts, and so RootLayout's usage tracking can tell them apart — same pattern as
- * MoneyPage's Argent/Actions sub-tab. */
-function useMaisonSubTab(): [MaisonSubTab, (tab: MaisonSubTab) => void] {
+ * MoneyPage's Argent/Actions sub-tab. Falls back to the first entry in `tabOrder` if the
+ * requested tab is disabled for this family (or doesn't exist). */
+function useMaisonSubTab(tabOrder: MaisonSubTab[]): [MaisonSubTab, (tab: MaisonSubTab) => void] {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requested = searchParams.get('tab');
-  const tab: MaisonSubTab =
-    requested === 'meals' || requested === 'shopping' || requested === 'laundry' ? requested : 'chores';
+  const requested = searchParams.get('tab') as MaisonSubTab | null;
+  const tab: MaisonSubTab = requested && tabOrder.includes(requested) ? requested : tabOrder[0]!;
   const setTab = (next: MaisonSubTab) => {
-    setSearchParams(next === 'chores' ? {} : { tab: next }, { replace: true });
+    setSearchParams(next === tabOrder[0] ? {} : { tab: next }, { replace: true });
   };
   return [tab, setTab];
 }
 
-function SubTabs({ active, onChange }: { active: MaisonSubTab; onChange: (tab: MaisonSubTab) => void }) {
+function SubTabs({
+  active,
+  onChange,
+  tabOrder,
+}: {
+  active: MaisonSubTab;
+  onChange: (tab: MaisonSubTab) => void;
+  tabOrder: MaisonSubTab[];
+}) {
   return (
     <div className="mb-6 flex gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
-      {SUB_TAB_ORDER.map((tab) => (
+      {tabOrder.map((tab) => (
         <button
           key={tab}
           type="button"
@@ -125,7 +134,14 @@ export function ChoresPage() {
 
 function ParentChoresPage() {
   const overview = useParentOverview();
-  const [tab, setTab] = useMaisonSubTab();
+  const settings = useSettings();
+  const tabOrder = SUB_TAB_ORDER.filter((t) => {
+    if (t === 'meals') return settings.data?.mealPlanEnabled;
+    if (t === 'shopping') return settings.data?.shoppingListEnabled;
+    if (t === 'laundry') return settings.data?.laundryEnabled;
+    return true;
+  });
+  const [tab, setTab] = useMaisonSubTab(tabOrder);
   const { parentModeEnabled } = useParentMode();
   const duties = useWeeklyDuties();
   const personalTasks = useMyPersonalTasks();
@@ -143,7 +159,7 @@ function ParentChoresPage() {
     | { kind: 'duty'; key: string; date: string; item: DutyRow }
     | { kind: 'task'; key: string; date: string; item: PersonalTaskSummary };
   const parentEntries: ParentEntry[] = [
-    ...visibleDuties.map((row): ParentEntry => ({ kind: 'duty', key: row.key, date: row.postponedTo ?? row.date, item: row })),
+    ...visibleDuties.map((row): ParentEntry => ({ kind: 'duty', key: row.key, date: row.date, item: row })),
     ...visiblePersonalTasks.map(
       (task): ParentEntry => ({ kind: 'task', key: task.id, date: task.recurring ? todayIso : task.date!, item: task }),
     ),
@@ -159,7 +175,7 @@ function ParentChoresPage() {
         </div>
         {parentModeEnabled && (
           <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-            Les tâches faites par les enfants sont à valider depuis Accueil, sous « Demandes ».
+            Les tâches faites par les enfants sont à valider depuis Dashboard, sous « Demandes ».
           </p>
         )}
 
@@ -199,7 +215,7 @@ function ParentChoresPage() {
 
   return (
     <div className="space-y-6">
-      <SubTabs active={tab} onChange={setTab} />
+      {tabOrder.length > 1 && <SubTabs active={tab} onChange={setTab} tabOrder={tabOrder} />}
 
       <SubTabPanel
         tab={tab}
@@ -214,7 +230,14 @@ function ChildChoresPage() {
   const duties = useWeeklyDuties();
   const personalTasks = useMyPersonalTasks();
   const [scope, setScope] = useState<ChoreScope>('today');
-  const [tab, setTab] = useMaisonSubTab();
+  const settings = useSettings();
+  const tabOrder = SUB_TAB_ORDER.filter((t) => {
+    if (t === 'meals') return settings.data?.mealPlanEnabled;
+    if (t === 'shopping') return settings.data?.shoppingListEnabled;
+    if (t === 'laundry') return settings.data?.laundryEnabled;
+    return true;
+  });
+  const [tab, setTab] = useMaisonSubTab(tabOrder);
 
   // "Aujourd'hui" hides WEEKLY chores (not due today specifically); "Cette semaine" shows
   // everything, including the ones due later in the week. Meal/laundry duties get the same
@@ -255,7 +278,7 @@ function ChildChoresPage() {
 
   return (
     <div className="space-y-6">
-      <SubTabs active={tab} onChange={setTab} />
+      {tabOrder.length > 1 && <SubTabs active={tab} onChange={setTab} tabOrder={tabOrder} />}
 
       <SubTabPanel
         tab={tab}

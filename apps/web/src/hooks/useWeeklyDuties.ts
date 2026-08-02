@@ -11,7 +11,10 @@ export interface DutyRow {
   icon: string;
   withNames: string[];
   done: boolean;
-  postponedTo: string | null;
+  /** Set (laundry only) when this row's assignees carried over from an earlier date that was
+   * postponed here — that original date no longer has its own row, so this is the only trace
+   * of it. Cancelling the postponement targets that original date, not `date` above. */
+  postponedFrom: string | null;
 }
 
 export function tomorrowOf(iso: string): string {
@@ -46,7 +49,7 @@ export function useWeeklyDuties() {
             icon: '🍳',
             withNames: day.assignedFirstNames.filter((_, i) => day.assignedUserIds[i] !== user.id),
             done: day.done,
-            postponedTo: day.postponedTo,
+            postponedFrom: null,
           })),
         ...(laundry.data ?? [])
           .filter((o) => o.assignedUserIds.includes(user.id))
@@ -59,16 +62,20 @@ export function useWeeklyDuties() {
             icon: '🧺',
             withNames: o.assignedFirstNames.filter((_, i) => o.assignedUserIds[i] !== user.id),
             done: o.done,
-            postponedTo: o.postponedTo,
+            postponedFrom: o.postponedFrom,
           })),
       ].sort((a, b) => a.date.localeCompare(b.date));
 
   function setStatus(row: DutyRow, data: { done?: boolean; postponeToDate?: string | null }) {
     if (row.kind === 'meal') {
       setMealStatus.mutate({ date: row.date, ...data });
-    } else {
-      setLaundryStatus.mutate({ laundryTypeId: row.laundryTypeId!, date: row.date, ...data });
+      return;
     }
+    // Cancelling a postponement (postponeToDate: null) has to reach back to the original date's
+    // status row — `row.date` is now wherever it landed, not where the postponement lives.
+    // Marking done or pushing further both act on the row as currently shown.
+    const targetDate = data.postponeToDate === null ? (row.postponedFrom ?? row.date) : row.date;
+    setLaundryStatus.mutate({ laundryTypeId: row.laundryTypeId!, date: targetDate, ...data });
   }
 
   return {

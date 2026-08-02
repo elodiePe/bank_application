@@ -341,8 +341,10 @@ export function MealPlanCard() {
       {upcoming.data && upcoming.data.length > 0 && (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 mb-5">
           {upcoming.data.map((day) => {
-            // Today's own turn is put front and center — bigger, tinted, badged — so it can't
-            // be missed among a week (or month) of otherwise-identical rows.
+            // Today's own turn is put front and center — bigger, badged — so it can't be missed
+            // among a week (or month) of otherwise-identical rows. It keeps the person's own
+            // color (not a separate orange highlight) so the color-coding stays consistent
+            // across the whole calendar.
             const isTodayMine = day.date === todayIso && day.assignedUserIds.includes(user?.id ?? '');
             // A shared turn (several people) doesn't get a single person's color — plain style.
             const style = day.assignedUserIds.length === 1 ? personColors.get(day.assignedUserIds[0]!) : undefined;
@@ -352,7 +354,7 @@ export function MealPlanCard() {
                 onClick={() => showAdmin && setEditingWeekday(day.weekday)}
                 className={
                   isTodayMine
-                    ? `flex items-center justify-between rounded-2xl border-2 border-l-8 border-orange-400 bg-orange-50 p-3 shadow-md dark:border-orange-500 dark:bg-orange-900/30 ${showAdmin ? 'cursor-pointer' : ''}`
+                    ? `flex items-center justify-between rounded-2xl border-2 border-l-8 p-3 shadow-md ${style ? `${style.border} ${style.bg}` : 'border-slate-400 bg-slate-100 dark:border-slate-500 dark:bg-slate-700/40'} ${showAdmin ? 'cursor-pointer' : ''}`
                     : `flex items-center justify-between rounded-2xl border border-l-8 p-3 shadow-sm ${style ? `${style.border} ${style.bg}` : 'border-slate-200/70 bg-white dark:border-slate-700/70 dark:bg-slate-800'} ${showAdmin ? 'cursor-pointer hover:brightness-95 dark:hover:brightness-125' : ''}`
                 }
               >
@@ -366,11 +368,9 @@ export function MealPlanCard() {
                   className={
                     day.done
                       ? 'text-sm text-slate-400 line-through dark:text-slate-500'
-                      : isTodayMine
-                        ? 'text-sm font-bold text-orange-700 dark:text-orange-300'
-                        : style
-                          ? `text-sm font-bold ${style.text}`
-                          : 'text-sm text-slate-500 dark:text-slate-400'
+                      : style
+                        ? `text-sm font-bold ${style.text}`
+                        : 'text-sm text-slate-500 dark:text-slate-400'
                   }
                 >
                   {day.done

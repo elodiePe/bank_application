@@ -54,7 +54,7 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data.json();
   } catch {
-    payload = { title: 'Banque Familiale', body: event.data.text() };
+    payload = { title: 'FamilyApp', body: event.data.text() };
   }
 
   const options: NotificationOptionsWithVibrate = {

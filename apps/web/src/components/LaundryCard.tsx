@@ -137,7 +137,7 @@ function TypeEditorModal({
   }
 
   return (
-    <Modal open onClose={onClose} title={initial ? 'Modifier le type de lessive' : 'Nouveau type de lessive'}>
+    <Modal open onClose={onClose} title={initial ? 'Modifier le type de ménage' : 'Nouveau type de ménage'}>
       <div className="flex flex-col gap-3">
         <label className="text-sm font-medium" htmlFor="laundry-name">
           Nom (ex. Blancs, Couleurs, Draps…)
@@ -327,8 +327,9 @@ function UpcomingList({ occurrences }: { occurrences: LaundryOccurrenceSummary[]
   return (
     <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {occurrences.map((occ) => {
-        // Today's own turn is put front and center — bigger, tinted, badged — same treatment
-        // as the meal plan's "C'est toi !" card, so both screens read the same way at a glance.
+        // Today's own turn is put front and center — bigger, badged — same treatment as the
+        // meal plan's "C'est toi !" card. It keeps the person's own color (not a separate
+        // orange highlight) so the color-coding stays consistent across the whole calendar.
         const isTodayMine = occ.date === todayIso && occ.assignedUserIds.includes(user?.id ?? '');
         // A shared turn (several people) doesn't get a single person's color — plain style.
         const style = occ.assignedUserIds.length === 1 ? personColors.get(occ.assignedUserIds[0]!) : undefined;
@@ -337,15 +338,17 @@ function UpcomingList({ occurrences }: { occurrences: LaundryOccurrenceSummary[]
             key={`${occ.laundryTypeId}-${occ.date}`}
             className={
               isTodayMine
-                ? 'flex items-center justify-between rounded-2xl border-2 border-l-8 border-orange-400 bg-orange-50 p-3 shadow-md dark:border-orange-500 dark:bg-orange-900/30'
+                ? `flex items-center justify-between rounded-2xl border-2 border-l-8 p-3 shadow-md ${style ? `${style.border} ${style.bg}` : 'border-slate-400 bg-slate-100 dark:border-slate-500 dark:bg-slate-700/40'}`
                 : `flex items-center justify-between rounded-2xl border border-l-8 p-3 shadow-sm ${style ? `${style.border} ${style.bg}` : 'border-slate-200/70 bg-white dark:border-slate-700/70 dark:bg-slate-800'}`
             }
           >
             <span className="text-sm font-medium">
               <span className="capitalize">
                 {formatOccurrenceDate(occ.date)}
-                {occ.postponedTo && (
-                  <span className="ml-1 text-xs font-normal text-slate-400 dark:text-slate-500">(reporté)</span>
+                {occ.postponedFrom && (
+                  <span className="ml-1 text-xs font-normal text-slate-400 dark:text-slate-500">
+                    (reporté depuis {formatOccurrenceDate(occ.postponedFrom)})
+                  </span>
                 )}
               </span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">{occ.laundryTypeName}</span>
@@ -354,11 +357,9 @@ function UpcomingList({ occurrences }: { occurrences: LaundryOccurrenceSummary[]
               className={
                 occ.done
                   ? 'text-sm text-slate-400 line-through dark:text-slate-500'
-                  : isTodayMine
-                    ? 'text-sm font-bold text-orange-700 dark:text-orange-300'
-                    : style
-                      ? `text-sm font-bold ${style.text}`
-                      : 'text-sm text-slate-500 dark:text-slate-400'
+                  : style
+                    ? `text-sm font-bold ${style.text}`
+                    : 'text-sm text-slate-500 dark:text-slate-400'
               }
             >
               {occ.done
@@ -400,7 +401,7 @@ export function LaundryCard() {
     <section className="space-y-6">
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Lessive</h2>
+          <h2 className="text-lg font-semibold">Ménage</h2>
           <div className="flex gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
             {(Object.keys(VIEW_LABELS) as ViewMode[]).map((v) => (
               <button
@@ -429,14 +430,14 @@ export function LaundryCard() {
           to="/settings"
           className="block rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
-          Mode gestion désactivé — réactive-le dans les Paramètres pour gérer la lessive →
+          Mode gestion désactivé — réactive-le dans les Paramètres pour gérer le ménage →
         </Link>
       )}
 
       {showAdmin && (
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400">Types de lessive</h3>
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400">Types de ménage</h3>
             <button
               type="button"
               onClick={() => setEditing('new')}
@@ -448,7 +449,7 @@ export function LaundryCard() {
 
           {types.data && types.data.length === 0 && (
             <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              Aucun type de lessive — ajoute-en un.
+              Aucun type de ménage — ajoute-en un.
             </p>
           )}
 

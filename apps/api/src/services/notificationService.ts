@@ -1,6 +1,13 @@
 import type { PrismaClient } from '@prisma/client';
-import type { NotificationSummary } from '@banque-familiale/shared';
+import {
+  categoryForNotificationType,
+  NOTIFICATION_CATEGORIES,
+  type NotificationCategory,
+  type NotificationPreferenceSummary,
+  type NotificationSummary,
+} from '@banque-familiale/shared';
 import { createNotificationRepository } from '../repositories/notificationRepository.js';
+import { createNotificationPreferenceRepository } from '../repositories/notificationPreferenceRepository.js';
 import { createUserRepository } from '../repositories/userRepository.js';
 import { createPushService } from './pushService.js';
 import { formatChf } from '../utils/currency.js';
@@ -46,8 +53,37 @@ function toSummary(n: {
 
 export function createNotificationService(prisma: PrismaClient) {
   const notificationRepo = createNotificationRepository(prisma);
+  const preferenceRepo = createNotificationPreferenceRepository(prisma);
   const userRepo = createUserRepository(prisma);
   const pushService = createPushService(prisma);
+
+  /** Drops any recipient who's turned off the category their notification's type falls under.
+   * A type with no category (only CREDENTIAL_RESET_REQUESTED today) is never filterable. Batches
+   * one preference lookup per distinct category rather than one per recipient. */
+  async function filterAllowed<T extends { userId: string; type: string }>(items: T[]): Promise<T[]> {
+    const categoryOf = (item: T) => categoryForNotificationType(item.type as NotificationSummary['type']);
+
+    const byCategory = new Map<NotificationCategory, string[]>();
+    for (const item of items) {
+      const category = categoryOf(item);
+      if (!category) continue;
+      byCategory.set(category, [...(byCategory.get(category) ?? []), item.userId]);
+    }
+    if (byCategory.size === 0) return items;
+
+    const disabledEntries = await Promise.all(
+      [...byCategory.entries()].map(
+        async ([category, userIds]) => [category, await preferenceRepo.listDisabledUserIds(userIds, category)] as const,
+      ),
+    );
+    const disabledByCategory = new Map(disabledEntries);
+
+    return items.filter((item) => {
+      const category = categoryOf(item);
+      if (!category) return true;
+      return !disabledByCategory.get(category)?.has(item.userId);
+    });
+  }
 
   /** Writes the in-app notification, then best-effort pushes the same content to the device.
    * `url` is push-only (never persisted) — it's what the OS notification deep-links to.
@@ -60,16 +96,22 @@ export function createNotificationService(prisma: PrismaClient) {
    * notification row (what actually matters for correctness) is still written and awaited
    * before this returns. */
   async function createAndPush(data: Parameters<typeof notificationRepo.create>[0], url: string) {
-    await notificationRepo.create(data);
-    void pushService.sendToUser(data.userId, { title: data.title, body: data.body, url }).catch((err) => {
+    const [allowed] = await filterAllowed([data]);
+    if (!allowed) return;
+
+    await notificationRepo.create(allowed);
+    void pushService.sendToUser(allowed.userId, { title: allowed.title, body: allowed.body, url }).catch((err) => {
       console.error('[push] background send failed', err);
     });
   }
 
   async function createManyAndPush(data: Parameters<typeof notificationRepo.createMany>[0], url: string) {
-    await notificationRepo.createMany(data);
+    const allowed = await filterAllowed(data);
+    if (allowed.length === 0) return;
+
+    await notificationRepo.createMany(allowed);
     void Promise.allSettled(
-      data.map((n) => pushService.sendToUser(n.userId, { title: n.title, body: n.body, url })),
+      allowed.map((n) => pushService.sendToUser(n.userId, { title: n.title, body: n.body, url })),
     );
   }
 
@@ -85,6 +127,19 @@ export function createNotificationService(prisma: PrismaClient) {
 
     deleteAllForUser(userId: string) {
       return notificationRepo.deleteAllForUser(userId);
+    },
+
+    async listPreferences(userId: string): Promise<NotificationPreferenceSummary[]> {
+      const rows = await preferenceRepo.listForUser(userId);
+      const enabledByCategory = new Map(rows.map((r) => [r.category, r.enabled]));
+      return NOTIFICATION_CATEGORIES.map((category) => ({
+        category,
+        enabled: enabledByCategory.get(category) ?? true,
+      }));
+    },
+
+    setPreference(userId: string, category: NotificationCategory, enabled: boolean) {
+      return preferenceRepo.upsert(userId, category, enabled);
     },
 
     async notifyParentsOfRequest(params: {
@@ -503,7 +558,7 @@ export function createNotificationService(prisma: PrismaClient) {
         {
           userId: params.userId,
           type: 'LAUNDRY_TURN',
-          title: "C'est ton tour pour la lessive !",
+          title: "C'est ton tour pour le ménage !",
           body: `N'oublie pas : « ${params.laundryTypeName} » est à faire aujourd'hui.`,
         },
         ROUTE.maison,
@@ -517,7 +572,7 @@ export function createNotificationService(prisma: PrismaClient) {
         {
           userId: params.userId,
           type: 'LAUNDRY_TURN',
-          title: 'Demain, à toi la lessive !',
+          title: 'Demain, à toi le ménage !',
           body: `Pense à « ${params.laundryTypeName} », c'est ton tour demain.`,
         },
         ROUTE.maison,
@@ -533,9 +588,8 @@ export function createNotificationService(prisma: PrismaClient) {
       );
     },
 
-    /** Broadcast to everyone else in the family — no dedicated type, just GENERIC — announcing
-     * that the requester is about to go shopping, so it's the last chance to add something to
-     * the list. */
+    /** Broadcast to everyone else in the family, announcing that the requester is about to go
+     * shopping, so it's the last chance to add something to the list. */
     async notifyShoppingTrip(params: { familyId: string; requesterId: string }) {
       const members = await userRepo.listFamilyMembers(params.familyId);
       const requester = members.find((m) => m.id === params.requesterId);
@@ -545,7 +599,7 @@ export function createNotificationService(prisma: PrismaClient) {
       await createManyAndPush(
         others.map((m) => ({
           userId: m.id,
-          type: 'GENERIC',
+          type: 'SHOPPING_TRIP',
           title: `${requester.firstName} va faire les courses`,
           body: "C'est maintenant ou jamais pour ajouter quelque chose à la liste !",
         })),

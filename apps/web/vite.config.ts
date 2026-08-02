@@ -25,8 +25,8 @@ export default defineConfig({
         // Relative to the manifest itself (served from `base`), so this works
         // unchanged whether the app lives at the domain root or under a sub-path.
         id: '.',
-        name: 'Banque Familiale',
-        short_name: 'Banque Familiale',
+        name: 'FamilyApp',
+        short_name: 'FamilyApp',
         description: "Gestion de l'argent de poche familial",
         start_url: '.',
         scope: '.',

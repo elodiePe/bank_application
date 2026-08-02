@@ -29,7 +29,7 @@ export function FamilyLoginPage() {
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-brand-600 dark:text-brand-400">Banque Familiale</h1>
+        <h1 className="text-2xl font-bold text-brand-600 dark:text-brand-400">FamilyApp</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Se connecter à votre famille</p>
       </div>
 

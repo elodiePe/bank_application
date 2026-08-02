@@ -64,8 +64,8 @@ export function BottomNav() {
       <NavLink to="/home" className={({ isActive }) => `${LINK_CLASS} ${isActive ? ACTIVE_LINK_CLASS : ''}`}>
         {({ isActive }) => (
           <>
-            <NavIcon icon="🏡" isActive={isActive} badgeCount={homeBadge} />
-            Accueil
+            <NavIcon icon="📊" isActive={isActive} badgeCount={homeBadge} />
+            Dashboard
           </>
         )}
       </NavLink>

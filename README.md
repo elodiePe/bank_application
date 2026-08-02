@@ -1,4 +1,4 @@
-# Banque Familiale
+# FamilyApp
 
 PWA de gestion d'argent de poche familial : les parents administrent un compte principal, chaque
 enfant dispose d'un compte virtuel avec historique, demandes d'argent, intérêts mensuels,

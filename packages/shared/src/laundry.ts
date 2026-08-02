@@ -44,8 +44,8 @@ export interface LaundryTypeSummary {
 /** One resolved calendar date — which laundry type is due, and who's doing it. Several people
  * can share the same turn, and several occurrences can share the same date if more than one
  * type is scheduled that day. `done` is a personal, self-reported checkbox — it never changes
- * who's due next. `postponedTo` is set when whoever was due pushed it to another date instead
- * (that date gains a synthetic occurrence, or the assignee if one already existed there). */
+ * who's due next. A postponed occurrence never appears at its original date — only once, at
+ * whichever date it was pushed to, with `postponedFrom` set to where it came from. */
 export interface LaundryOccurrenceSummary {
   date: string;
   weekday: number;
@@ -54,7 +54,7 @@ export interface LaundryOccurrenceSummary {
   assignedUserIds: string[];
   assignedFirstNames: string[];
   done: boolean;
-  postponedTo: string | null;
+  postponedFrom: string | null;
 }
 
 export const setLaundryOccurrenceStatusSchema = z

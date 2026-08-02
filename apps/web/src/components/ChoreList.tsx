@@ -91,7 +91,7 @@ function buildEntries(chores: ChoreSummary[], dutyRows: DutyRow[], taskRows: Per
   const today = new Date().toISOString().slice(0, 10);
   return [
     ...chores.map((item): ListEntry => ({ kind: 'chore', date: today, item })),
-    ...dutyRows.map((item): ListEntry => ({ kind: 'duty', date: item.postponedTo ?? item.date, item })),
+    ...dutyRows.map((item): ListEntry => ({ kind: 'duty', date: item.date, item })),
     ...taskRows.map((item): ListEntry => ({ kind: 'task', date: item.recurring ? today : item.date!, item })),
   ];
 }

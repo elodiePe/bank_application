@@ -33,6 +33,6 @@ export const env = {
   // HTTP-based transactional email (Resend) — SMTP doesn't work from Render, which blocks
   // outbound connections on mail ports regardless of credentials.
   resendApiKey: process.env.RESEND_API_KEY,
-  emailFrom: required('EMAIL_FROM', 'Banque Familiale <no-reply@example.com>'),
+  emailFrom: required('EMAIL_FROM', 'FamilyApp <no-reply@example.com>'),
   finnhubApiKey: process.env.FINNHUB_API_KEY,
 };

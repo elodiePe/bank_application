@@ -1,5 +1,11 @@
 import type { Request, Response } from 'express';
-import { pushSubscriptionSchema, pushUnsubscribeSchema } from '@banque-familiale/shared';
+import type { NotificationCategory } from '@prisma/client';
+import {
+  NOTIFICATION_CATEGORIES,
+  pushSubscriptionSchema,
+  pushUnsubscribeSchema,
+  updateNotificationPreferenceSchema,
+} from '@banque-familiale/shared';
 import type { NotificationService } from '../services/notificationService.js';
 import type { PushService } from '../services/pushService.js';
 import { env } from '../utils/env.js';
@@ -19,6 +25,23 @@ export function createNotificationController(notificationService: NotificationSe
 
     async deleteAll(req: Request, res: Response) {
       await notificationService.deleteAllForUser(req.auth!.sub);
+      res.status(204).end();
+    },
+
+    async listPreferences(req: Request, res: Response) {
+      const preferences = await notificationService.listPreferences(req.auth!.sub);
+      res.json(preferences);
+    },
+
+    async updatePreference(req: Request, res: Response) {
+      const category = String(req.params.category);
+      if (!NOTIFICATION_CATEGORIES.includes(category as NotificationCategory)) {
+        throw new ValidationError('Catégorie de notification invalide');
+      }
+      const parsed = updateNotificationPreferenceSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+      await notificationService.setPreference(req.auth!.sub, category as NotificationCategory, parsed.data.enabled);
       res.status(204).end();
     },
 

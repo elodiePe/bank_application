@@ -2,8 +2,9 @@ import type { FamilyMemberDetail } from '@banque-familiale/shared';
 
 /** Shared by the meal plan's rotation order and each laundry type's rotation order: an ordered
  * list of turns, each turn being one or more people doing it together (e.g. "kids team up on
- * laundry" or "Papa + Maman cook together every third week"). Members already used somewhere
- * in the order can't be added again — the same person can't hold two turns at once. */
+ * laundry" or "Papa + Maman cook together every third week"). Each member holds exactly one
+ * turn — picking them into a different turn's "+ ensemble" select moves them there (removing
+ * them from wherever they were), rather than requiring them to be manually removed first. */
 export function GroupOrderEditor({
   members,
   groups,
@@ -18,11 +19,18 @@ export function GroupOrderEditor({
   const firstNameOf = (id: string) => members.find((m) => m.id === id)?.firstName ?? '?';
 
   function addNewTurn(memberId: string) {
-    onChange([...groups, [memberId]]);
+    onChange([...groups.map((g) => g.filter((id) => id !== memberId)).filter((g) => g.length > 0), [memberId]]);
   }
 
-  function addToGroup(groupIndex: number, memberId: string) {
-    onChange(groups.map((g, i) => (i === groupIndex ? [...g, memberId] : g)));
+  function moveIntoGroup(groupIndex: number, memberId: string) {
+    onChange(
+      groups
+        .map((g, i) => {
+          if (i === groupIndex) return g.includes(memberId) ? g : [...g, memberId];
+          return g.filter((id) => id !== memberId);
+        })
+        .filter((g) => g.length > 0),
+    );
   }
 
   function removeFromGroup(groupIndex: number, memberId: string) {
@@ -49,42 +57,45 @@ export function GroupOrderEditor({
       </div>
       {groups.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          {groups.map((group, index) => (
-            <div
-              key={index}
-              className="flex flex-wrap items-center gap-1.5 rounded-xl bg-brand-100 px-3 py-1.5 text-xs font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-400"
-            >
-              <span className="opacity-70">{index + 1}.</span>
-              {group.map((id) => (
-                <span key={id} className="flex items-center gap-1">
-                  {firstNameOf(id)}
-                  <button
-                    type="button"
-                    onClick={() => removeFromGroup(index, id)}
-                    aria-label={`Retirer ${firstNameOf(id)}`}
-                    className="text-brand-500 hover:text-brand-800 dark:hover:text-brand-200"
+          {groups.map((group, index) => {
+            const eligible = members.filter((m) => !group.includes(m.id));
+            return (
+              <div
+                key={index}
+                className="flex flex-wrap items-center gap-1.5 rounded-xl bg-brand-100 px-3 py-1.5 text-xs font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-400"
+              >
+                <span className="opacity-70">{index + 1}.</span>
+                {group.map((id) => (
+                  <span key={id} className="flex items-center gap-1">
+                    {firstNameOf(id)}
+                    <button
+                      type="button"
+                      onClick={() => removeFromGroup(index, id)}
+                      aria-label={`Retirer ${firstNameOf(id)}`}
+                      className="text-brand-500 hover:text-brand-800 dark:hover:text-brand-200"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                {eligible.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(e) => e.target.value && moveIntoGroup(index, e.target.value)}
+                    aria-label="Ajouter quelqu'un à ce tour"
+                    className="rounded-full border border-brand-300 bg-white px-2 py-0.5 text-xs text-brand-700 dark:border-brand-700 dark:bg-slate-900 dark:text-brand-400"
                   >
-                    ✕
-                  </button>
-                </span>
-              ))}
-              {unused.length > 0 && (
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && addToGroup(index, e.target.value)}
-                  aria-label="Ajouter quelqu'un à ce tour"
-                  className="rounded-full border border-brand-300 bg-white px-2 py-0.5 text-xs text-brand-700 dark:border-brand-700 dark:bg-slate-900 dark:text-brand-400"
-                >
-                  <option value="">+ ensemble</option>
-                  {unused.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.firstName}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          ))}
+                    <option value="">+ ensemble</option>
+                    {eligible.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.firstName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

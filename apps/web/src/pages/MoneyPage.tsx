@@ -4,6 +4,7 @@ import type { ChildBalanceSummary, TransactionSummary } from '@banque-familiale/
 import { useCurrentUser, usePermission } from '../hooks/useAuth.js';
 import { useChildOverview, useMyTransactions, useParentOverview, useRecentTransactions } from '../hooks/useDashboard.js';
 import { convertCents, useFxRate } from '../hooks/useFx.js';
+import { useSettings } from '../hooks/useTransactionActions.js';
 import { formatMoney, STORAGE_CURRENCY } from '../utils/currency.js';
 import { ChildBalanceCard } from '../components/ChildBalanceCard.js';
 import { ChildPortfolioSummary } from '../components/ChildPortfolioSummary.js';
@@ -87,11 +88,13 @@ export function MoneyPage() {
 function ParentMoneyPage() {
   const overview = useParentOverview();
   const recentTransactions = useRecentTransactions(RECENT_TRANSACTIONS_LIMIT);
-  const { currency, rate } = useFxRate();
+  const { currency, rate, rateLoading } = useFxRate();
   const canManageMoney = usePermission('canManageMoney');
   const canManageActions = usePermission('canManageActions');
+  const settings = useSettings();
 
-  const [tab, setTab] = useMoneySubTab(PARENT_TAB_ORDER);
+  const tabOrder = PARENT_TAB_ORDER.filter((t) => t !== 'stocks' || settings.data?.stocksEnabled);
+  const [tab, setTab] = useMoneySubTab(tabOrder);
   const [moneyAction, setMoneyAction] = useState<MoneyAction | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [correctionTarget, setCorrectionTarget] = useState<TransactionSummary | null>(null);
@@ -102,7 +105,7 @@ function ParentMoneyPage() {
     <div className="space-y-8">
       <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-4 text-center text-white shadow-md">
         <p className="text-xs text-brand-100">Solde total de la famille</p>
-        <p className="mt-1 text-xl font-bold">{overview.isLoading ? '…' : totalBalance}</p>
+        <p className="mt-1 text-xl font-bold">{overview.isLoading || rateLoading ? '…' : totalBalance}</p>
       </div>
 
       <section>
@@ -183,7 +186,7 @@ function ParentMoneyPage() {
 
   return (
     <div className="space-y-6">
-      <SubTabs active={tab} onChange={setTab} tabOrder={PARENT_TAB_ORDER} />
+      {tabOrder.length > 1 && <SubTabs active={tab} onChange={setTab} tabOrder={tabOrder} />}
 
       <SubTabPanel tab={tab} panels={{ money: moneyPanel, stocks: stocksPanel }} />
 
@@ -209,8 +212,10 @@ function ChildMoneyPage() {
   const { data: user } = useCurrentUser();
   const overview = useChildOverview();
   const transactions = useMyTransactions(RECENT_TRANSACTIONS_LIMIT);
-  const { currency, rate } = useFxRate();
-  const [tab, setTab] = useMoneySubTab(CHILD_TAB_ORDER);
+  const { currency, rate, rateLoading } = useFxRate();
+  const settings = useSettings();
+  const tabOrder = CHILD_TAB_ORDER.filter((t) => t !== 'stocks' || settings.data?.stocksEnabled);
+  const [tab, setTab] = useMoneySubTab(tabOrder);
   const [disputeTarget, setDisputeTarget] = useState<TransactionSummary | null>(null);
 
   const balance = formatMoney(convertCents(overview.data?.balanceCents ?? 0, rate), currency);
@@ -219,7 +224,7 @@ function ChildMoneyPage() {
     <div className="space-y-8">
       <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-4 text-center text-white shadow-md">
         <p className="text-xs text-brand-100 ">Mon solde</p>
-        <p className="mt-1 text-xl font-bold">{overview.isLoading ? '…' : balance}</p>
+        <p className="mt-1 text-xl font-bold">{overview.isLoading || rateLoading ? '…' : balance}</p>
         {overview.data && overview.data.weeklyAllowanceCents > 0 && (
           <p className="mt-1 text-xs text-brand-100">
             Argent de poche : {formatMoney(overview.data.weeklyAllowanceCents, STORAGE_CURRENCY)} / semaine
@@ -272,7 +277,7 @@ function ChildMoneyPage() {
 
   return (
     <div className="space-y-6">
-      <SubTabs active={tab} onChange={setTab} tabOrder={CHILD_TAB_ORDER} />
+      {tabOrder.length > 1 && <SubTabs active={tab} onChange={setTab} tabOrder={tabOrder} />}
 
       <SubTabPanel tab={tab} panels={{ money: moneyPanel, stocks: stocksPanel, savings: savingsPanel }} />
 

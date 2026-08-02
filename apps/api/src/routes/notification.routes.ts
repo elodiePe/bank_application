@@ -18,6 +18,9 @@ export function createNotificationRouter(prisma: PrismaClient) {
   router.delete('/:id', asyncHandler((req, res) => controller.deleteOne(req, res)));
   router.delete('/', asyncHandler((req, res) => controller.deleteAll(req, res)));
 
+  router.get('/preferences', asyncHandler((req, res) => controller.listPreferences(req, res)));
+  router.put('/preferences/:category', asyncHandler((req, res) => controller.updatePreference(req, res)));
+
   router.get('/push/vapid-public-key', asyncHandler((req, res) => controller.vapidPublicKey(req, res)));
   router.post('/push/subscribe', asyncHandler((req, res) => controller.subscribePush(req, res)));
   router.post('/push/unsubscribe', asyncHandler((req, res) => controller.unsubscribePush(req, res)));

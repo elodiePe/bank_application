@@ -175,6 +175,23 @@ describe('familyAuthService', () => {
       validatedById: parent.id,
     });
 
+    // These models scope themselves to a family with a loose `familyId` field and no actual
+    // foreign key (see familyRepository.delete's comment) — Postgres has nothing to cascade
+    // through for them, so they must be cleaned up explicitly or they'd survive as orphans.
+    const laundryType = await db.prisma.laundryType.create({
+      data: { familyId: reg.familyId, name: 'Blancs', scheduleType: 'WEEKLY', weekdays: [1] },
+    });
+    await db.prisma.pointsRewardGoal.create({
+      data: { familyId: reg.familyId, childUserId: child.id, title: 'Choisir le dessert', pointsRequired: 10 },
+    });
+    await db.prisma.mealPlanSlot.create({ data: { familyId: reg.familyId, weekday: 0 } });
+    await db.prisma.mealPlanRotationOrder.create({ data: { familyId: reg.familyId } });
+    await db.prisma.mealPlanChoreConfig.create({ data: { familyId: reg.familyId } });
+    await db.prisma.mealPlanOccurrenceStatus.create({ data: { familyId: reg.familyId, date: new Date() } });
+    await db.prisma.laundryOccurrenceStatus.create({
+      data: { familyId: reg.familyId, laundryTypeId: laundryType.id, date: new Date() },
+    });
+
     const token = signEmailActionToken({
       familyId: reg.familyId,
       email: 'cascade@test.example',
@@ -187,6 +204,14 @@ describe('familyAuthService', () => {
     expect(await db.prisma.user.findUnique({ where: { id: parent.id } })).toBeNull();
     expect(await db.prisma.user.findUnique({ where: { id: child.id } })).toBeNull();
     expect(await db.prisma.transaction.findMany({ where: { accountId: childAccount.id } })).toHaveLength(0);
+
+    expect(await db.prisma.laundryType.findMany({ where: { familyId: reg.familyId } })).toHaveLength(0);
+    expect(await db.prisma.pointsRewardGoal.findMany({ where: { familyId: reg.familyId } })).toHaveLength(0);
+    expect(await db.prisma.mealPlanSlot.findMany({ where: { familyId: reg.familyId } })).toHaveLength(0);
+    expect(await db.prisma.mealPlanRotationOrder.findUnique({ where: { familyId: reg.familyId } })).toBeNull();
+    expect(await db.prisma.mealPlanChoreConfig.findUnique({ where: { familyId: reg.familyId } })).toBeNull();
+    expect(await db.prisma.mealPlanOccurrenceStatus.findMany({ where: { familyId: reg.familyId } })).toHaveLength(0);
+    expect(await db.prisma.laundryOccurrenceStatus.findMany({ where: { familyId: reg.familyId } })).toHaveLength(0);
   });
 
   describe('password reset', () => {

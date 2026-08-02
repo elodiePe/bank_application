@@ -18,6 +18,10 @@ export function useFxRate() {
   return {
     currency,
     rate: currency === 'CHF' ? 1 : (query.data?.rate ?? null),
+    // True only while a non-CHF rate is genuinely still in flight — callers should show a
+    // loading placeholder instead of a number, since showing the raw CHF cents under the new
+    // currency's symbol would silently look like "nothing changed" rather than "still loading".
+    rateLoading: currency !== 'CHF' && query.isLoading,
   };
 }
 

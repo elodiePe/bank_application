@@ -12,6 +12,7 @@ import { ApiError } from '../services/api.js';
 import { useLogoutFamily } from '../hooks/useFamilyAuth.js';
 import { useRequestMemberPinReset, useRequestPinResetNotification } from '../hooks/useMembers.js';
 import { PinPad } from '../components/PinPad.js';
+import { assignPersonColors } from '../utils/personColors.js';
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_CREDENTIAL: 'Identifiant incorrect.',
@@ -41,6 +42,7 @@ export function LoginPage() {
   const [pin, setPin] = useState('');
 
   const membersQuery = useQuery({ queryKey: ['auth', 'members'], queryFn: fetchFamilyMembers });
+  const memberColors = assignPersonColors((membersQuery.data ?? []).map((m) => m.id));
 
   // Full clear, not just an invalidate: every member-scoped query (chores, money
   // requests, dashboard overview...) is cached under a fixed key with no user id in it, so
@@ -104,7 +106,7 @@ export function LoginPage() {
         </button>
       )}
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-brand-600 dark:text-brand-400">Banque Familiale</h1>
+        <h1 className="text-2xl font-bold text-brand-600 dark:text-brand-400">FamilyApp</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           {selected ? `Bonjour ${selected.firstName}` : 'Qui se connecte ?'}
         </p>
@@ -182,7 +184,9 @@ export function LoginPage() {
                 onClick={() => selectMember(member)}
                 className="flex flex-col items-center gap-2 rounded-xl p-3 hover:bg-slate-100 dark:hover:bg-slate-900"
               >
-                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-500 text-xl font-semibold text-white">
+                <span
+                  className={`flex h-16 w-16 items-center justify-center rounded-full text-xl font-semibold text-white ${memberColors.get(member.id)?.solid ?? 'bg-brand-500'}`}
+                >
                   {initials(member.firstName)}
                 </span>
                 <span className="text-sm font-medium">{member.firstName}</span>

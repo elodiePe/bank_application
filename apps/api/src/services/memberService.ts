@@ -65,6 +65,7 @@ export function createMemberService(prisma: PrismaClient) {
     firstName: string;
     role: 'PARENT' | 'CHILD';
     pin: string;
+    email?: string;
     isAdmin?: boolean;
     canManageMoney?: boolean;
     canManageActions?: boolean;
@@ -83,6 +84,7 @@ export function createMemberService(prisma: PrismaClient) {
           role: params.role,
           firstName: params.firstName,
           pinHash,
+          ...(params.role === 'PARENT' && params.email ? { email: params.email } : {}),
           ...(params.role === 'PARENT'
             ? {
                 isAdmin: params.isAdmin ?? false,
@@ -210,6 +212,7 @@ export function createMemberService(prisma: PrismaClient) {
       familyId: string;
       firstName: string;
       pin: string;
+      ownerEmail: string;
     }): Promise<FamilyMemberDetail> {
       const existing = await userRepo.listAllFamilyMembers(params.familyId);
       if (existing.length > 0) {
@@ -221,6 +224,7 @@ export function createMemberService(prisma: PrismaClient) {
         firstName: params.firstName,
         role: 'PARENT',
         pin: params.pin,
+        email: params.ownerEmail,
         isAdmin: true,
       });
 

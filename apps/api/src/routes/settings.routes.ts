@@ -30,6 +30,12 @@ export function createSettingsRouter(prisma: PrismaClient) {
     requirePermission('canManageSettings'),
     asyncHandler((req, res) => controller.updateCurrency(req, res)),
   );
+  router.put(
+    '/features',
+    requireRole('PARENT'),
+    requirePermission('canManageSettings'),
+    asyncHandler((req, res) => controller.updateFeatureFlags(req, res)),
+  );
 
   return router;
 }

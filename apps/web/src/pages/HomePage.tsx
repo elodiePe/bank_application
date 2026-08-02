@@ -9,6 +9,7 @@ import { useChildOverview } from '../hooks/useDashboard.js';
 import { useMealPlanUpcoming } from '../hooks/useMealPlan.js';
 import { useLaundryUpcoming } from '../hooks/useLaundry.js';
 import { useShortcutOrder, type ShortcutKey } from '../hooks/useShortcutUsage.js';
+import { useSettings } from '../hooks/useTransactionActions.js';
 import { MoneyRequestList } from '../components/MoneyRequestList.js';
 import { RequestMoneyModal } from '../components/RequestMoneyModal.js';
 import { DisputeList } from '../components/DisputeList.js';
@@ -20,6 +21,7 @@ import { DISPUTE_STATUS_LABELS } from '../utils/disputeLabels.js';
 import { TRANSACTION_TYPE_LABELS } from '../utils/transactionLabels.js';
 import { formatChoreReward } from '../utils/chore.js';
 import { statusBackgroundClass } from '../utils/statusColors.js';
+import { colorForPerson } from '../utils/personColors.js';
 
 /** DisputeSummary carries a snapshot of the disputed transaction (type/amount/date), enough
  * to build a CorrectionModal-compatible TransactionSummary without a second fetch. */
@@ -72,17 +74,34 @@ const SHORTCUT_META: Record<ShortcutKey, { to: string; icon: string; label: stri
   stocks: { to: '/dashboard?tab=stocks', icon: '📈', label: 'Actions' },
 };
 
-/** The 4 feature shortcuts, ordered by how much this member actually uses each one (tracked
+const SHORTCUT_GRID_COLS: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+  4: 'grid-cols-4',
+};
+
+/** The feature shortcuts, ordered by how much this member actually uses each one (tracked
  * locally on this device) — the most-used lands first, so frequent destinations stay one tap
- * away instead of being buried behind whichever order they were coded in. */
+ * away instead of being buried behind whichever order they were coded in. Shortcuts for
+ * sections a parent hasn't enabled (see feature toggles) are filtered out entirely — "chores"
+ * always stays since it can't be disabled. */
 function DynamicShortcuts({ userId }: { userId: string | undefined }) {
   const order = useShortcutOrder(userId);
+  const settings = useSettings();
+  const visible = order.filter((key) => {
+    if (key === 'meals') return settings.data?.mealPlanEnabled;
+    if (key === 'shopping') return settings.data?.shoppingListEnabled;
+    if (key === 'stocks') return settings.data?.stocksEnabled;
+    return true;
+  });
+  if (visible.length === 0) return null;
 
   return (
     <section>
       {/* <h2 className="mb-3 text-lg font-semibold">Raccourcis</h2> */}
-      <div className="grid grid-cols-4 gap-2">
-        {order.map((key) => {
+      <div className={`grid gap-2 ${SHORTCUT_GRID_COLS[visible.length] ?? 'grid-cols-4'}`}>
+        {visible.map((key) => {
           const meta = SHORTCUT_META[key];
           return (
             <Link
@@ -103,17 +122,18 @@ function DynamicShortcuts({ userId }: { userId: string | undefined }) {
 /** Front-and-center banner shown only to whoever is assigned to cook today — easy to miss
  * buried in the meal-plan list, so it also gets a callout on Accueil itself. */
 function CookingTurnBanner({ userId }: { userId: string | undefined }) {
+  const settings = useSettings();
   const upcoming = useMealPlanUpcoming(1);
   const today = upcoming.data?.[0];
-  if (!userId || !today || !today.assignedUserIds.includes(userId)) return null;
+  if (!settings.data?.mealPlanEnabled || !userId || !today || !today.assignedUserIds.includes(userId)) return null;
 
   return (
     <Link
       to="/chores?tab=meals"
-      className="block rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 p-4 text-white shadow-md hover:opacity-95"
+      className={`block rounded-2xl p-4 text-white shadow-md hover:opacity-95 ${colorForPerson(userId).solid}`}
     >
       <p className="font-semibold">🍳 C'est à toi de faire à manger aujourd'hui !</p>
-      <p className="text-sm text-orange-100">Voir le planning des repas →</p>
+      <p className="text-sm text-white/80">Voir le planning des repas →</p>
     </Link>
   );
 }
@@ -121,8 +141,9 @@ function CookingTurnBanner({ userId }: { userId: string | undefined }) {
 /** Same treatment as CookingTurnBanner, but for laundry — several types can be due the same
  * day, so this can render more than one banner. */
 function LaundryTurnBanner({ userId }: { userId: string | undefined }) {
+  const settings = useSettings();
   const upcoming = useLaundryUpcoming(1);
-  if (!userId) return null;
+  if (!settings.data?.laundryEnabled || !userId) return null;
   const mine = (upcoming.data ?? []).filter((occ) => occ.assignedUserIds.includes(userId));
   if (mine.length === 0) return null;
 
@@ -132,10 +153,10 @@ function LaundryTurnBanner({ userId }: { userId: string | undefined }) {
         <Link
           key={occ.laundryTypeId}
           to="/chores?tab=laundry"
-          className="block rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 p-4 text-white shadow-md hover:opacity-95"
+          className={`block rounded-2xl p-4 text-white shadow-md hover:opacity-95 ${colorForPerson(userId).solid}`}
         >
-          <p className="font-semibold">🧺 C'est à toi de faire la lessive ({occ.laundryTypeName}) aujourd'hui !</p>
-          <p className="text-sm text-sky-100">Voir le planning des lessives →</p>
+          <p className="font-semibold">🧺 Activité du jour:  {occ.laundryTypeName}</p>
+          <p className="text-sm text-white/80">Voir le planning du ménage →</p>
         </Link>
       ))}
     </div>
@@ -320,7 +341,7 @@ function ChildHomePage() {
       )}
 
       <section>
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Mes demandes</h2>
           <button
             type="button"

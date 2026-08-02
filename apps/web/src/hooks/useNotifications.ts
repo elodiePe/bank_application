@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteAllNotifications, deleteNotification, fetchMyNotifications } from '../services/notification.service.js';
+import type { NotificationCategory } from '@banque-familiale/shared';
+import {
+  deleteAllNotifications,
+  deleteNotification,
+  fetchMyNotifications,
+  fetchNotificationPreferences,
+  updateNotificationPreference,
+} from '../services/notification.service.js';
 
 export function useMyNotifications() {
   return useQuery({
@@ -30,5 +37,22 @@ export function useDeleteAllNotifications() {
   return useMutation({
     mutationFn: deleteAllNotifications,
     onSuccess: invalidate,
+  });
+}
+
+export function useNotificationPreferences() {
+  return useQuery({
+    queryKey: ['notifications', 'preferences'],
+    queryFn: fetchNotificationPreferences,
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdateNotificationPreference() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ category, enabled }: { category: NotificationCategory; enabled: boolean }) =>
+      updateNotificationPreference(category, enabled),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', 'preferences'] }),
   });
 }

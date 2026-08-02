@@ -19,7 +19,7 @@ export function DutyCard({
 }) {
   const todayIso = new Date().toISOString().slice(0, 10);
   const isToday = row.date === todayIso;
-  const isPostponed = row.postponedTo !== null;
+  const isPostponed = row.postponedFrom !== null;
   // Postponing a meal doesn't make sense — someone still has to eat that day — so it's only
   // offered for laundry, which can genuinely wait until tomorrow.
   const canPostpone = row.kind !== 'meal';
@@ -27,7 +27,7 @@ export function DutyCard({
   const subtitleParts = [
     row.withNames.length > 0 ? `avec ${row.withNames.join(', ')}` : null,
     isPostponed
-      ? `Reporté au ${formatTaskDate(row.postponedTo!)}`
+      ? `Reporté depuis ${formatTaskDate(row.postponedFrom!)}`
       : isToday
         ? "Aujourd'hui"
         : formatTaskDate(row.date),

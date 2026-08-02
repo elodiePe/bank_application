@@ -39,7 +39,7 @@ export function VerifyEmailPage() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
-      <h1 className="text-2xl font-bold text-brand-600 dark:text-brand-400">Banque Familiale</h1>
+      <h1 className="text-2xl font-bold text-brand-600 dark:text-brand-400">FamilyApp</h1>
 
       {!token && <p className="text-red-600 dark:text-red-400">Lien de confirmation invalide.</p>}
 

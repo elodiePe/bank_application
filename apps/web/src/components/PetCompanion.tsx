@@ -85,7 +85,7 @@ export function PetCompanion({
   userId: string | undefined;
   onStageIndexChange?: (index: number) => void;
 }) {
-  const { currency, rate } = useFxRate();
+  const { currency, rate, rateLoading } = useFxRate();
   const { stage, index, next } = stageFor(balanceCents);
   const { name, setName } = usePetName(userId, stage.label);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -188,7 +188,9 @@ export function PetCompanion({
         </p>
       </div>
 
-      <p className="mt-3 text-4xl font-extrabold">{formatMoney(convertCents(balanceCents, rate), currency)}</p>
+      <p className="mt-3 text-4xl font-extrabold">
+        {rateLoading ? '…' : formatMoney(convertCents(balanceCents, rate), currency)}
+      </p>
       <p className="text-xs text-brand-100">dans ta tirelire</p>
 
       <RenameModal open={renameOpen} onClose={() => setRenameOpen(false)} currentName={name} onSave={setName} />
