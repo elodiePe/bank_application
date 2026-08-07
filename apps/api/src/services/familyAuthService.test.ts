@@ -2,7 +2,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // Never let tests reach a real SMTP server — sendEmail is fire-and-forget/best-effort in
 // the services under test, but a real network call is slow and flaky in CI regardless.
-vi.mock('./emailService.js', () => ({ sendEmail: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('./emailService.js', () => ({
+  sendEmail: vi.fn().mockResolvedValue(undefined),
+  sendEmailStrict: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { createTestDb, type TestDb } from '../test-utils/testDb.js';
 import { createFamilyAuthService, type FamilyAuthService } from './familyAuthService.js';
@@ -62,6 +65,58 @@ describe('familyAuthService', () => {
 
     expect(login.familyId).not.toBe(other.familyId);
   });
+
+  it('login only starts an MFA challenge — the password alone never returns a session token', async () => {
+    const reg = await service.registerFamily({
+      familyName: 'MFA Family',
+      ownerEmail: 'mfa@test.example',
+      ownerPassword: 'mfa-secret-1',
+    });
+    expect(reg.ok).toBe(true);
+    if (!reg.ok) return;
+
+    const login = await service.loginFamilyOwner({ ownerEmail: 'mfa@test.example', ownerPassword: 'mfa-secret-1' });
+    expect(login.ok).toBe(true);
+    if (!login.ok) return;
+    expect(login.mfaRequired).toBe(true);
+    expect(login).not.toHaveProperty('token');
+    expect(login.devCode).toMatch(/^\d{6}$/);
+
+    const wrongCode = await service.verifyOwnerMfaCode({ familyId: login.familyId, code: '000000' });
+    expect(wrongCode).toMatchObject({ ok: false, reason: 'invalid_code' });
+
+    const rightCode = await service.verifyOwnerMfaCode({ familyId: login.familyId, code: login.devCode! });
+    expect(rightCode.ok).toBe(true);
+    if (!rightCode.ok) return;
+    expect(rightCode.token).toBeTruthy();
+
+    // Single-use: the same code can't be replayed once already consumed.
+    const replay = await service.verifyOwnerMfaCode({ familyId: login.familyId, code: login.devCode! });
+    expect(replay).toMatchObject({ ok: false, reason: 'expired' });
+  });
+
+  it('invalidates the MFA challenge after too many wrong codes, even the right one afterwards', async () => {
+    const reg = await service.registerFamily({
+      familyName: 'MFA Lockout Family',
+      ownerEmail: 'mfa-lockout@test.example',
+      ownerPassword: 'mfa-lockout-1',
+    });
+    expect(reg.ok).toBe(true);
+    if (!reg.ok) return;
+
+    const login = await service.loginFamilyOwner({
+      ownerEmail: 'mfa-lockout@test.example',
+      ownerPassword: 'mfa-lockout-1',
+    });
+    expect(login.ok).toBe(true);
+    if (!login.ok) return;
+
+    for (let i = 0; i < 5; i++) {
+      await service.verifyOwnerMfaCode({ familyId: login.familyId, code: '111111' });
+    }
+    const afterLockout = await service.verifyOwnerMfaCode({ familyId: login.familyId, code: login.devCode! });
+    expect(afterLockout).toMatchObject({ ok: false, reason: 'expired' });
+  }, 15_000);
 
   it('rejects a wrong password without revealing whether the email exists', async () => {
     const result = await service.loginFamilyOwner({
@@ -144,6 +199,9 @@ describe('familyAuthService', () => {
   });
 
   it('cascades deletion through members, accounts and transactions without FK errors', async () => {
+    // More sequential round trips to the DB than the other cases here (register, two
+    // members, transactions, then a multi-table cascade delete) — the default 5s timeout
+    // is too tight against the remote Supabase pooler's latency.
     const reg = await service.registerFamily({
       familyName: 'Cascade Family',
       ownerEmail: 'cascade@test.example',
@@ -157,6 +215,7 @@ describe('familyAuthService', () => {
       familyId: reg.familyId,
       firstName: 'Parent',
       pin: '1357',
+      ownerEmail: 'cascade@test.example',
     });
     const child = await memberService.addFamilyMember({
       familyId: reg.familyId,
@@ -212,7 +271,7 @@ describe('familyAuthService', () => {
     expect(await db.prisma.mealPlanChoreConfig.findUnique({ where: { familyId: reg.familyId } })).toBeNull();
     expect(await db.prisma.mealPlanOccurrenceStatus.findMany({ where: { familyId: reg.familyId } })).toHaveLength(0);
     expect(await db.prisma.laundryOccurrenceStatus.findMany({ where: { familyId: reg.familyId } })).toHaveLength(0);
-  });
+  }, 20000);
 
   describe('password reset', () => {
     it('resets the owner password with a valid token and it works for the next login', async () => {

@@ -41,6 +41,17 @@ export function createUserRepository(prisma: PrismaClient) {
       });
     },
 
+    /** Active children only — a deactivated child no longer counts against the family's
+     * subscription-tier child limit (see memberService.addFamilyMember). */
+    countActiveChildren(familyId: string) {
+      return prisma.user.count({ where: { familyId, role: 'CHILD', deactivatedAt: null } });
+    },
+
+    /** Mirrors countActiveChildren, for the subscription-tier parent limit. */
+    countActiveParents(familyId: string) {
+      return prisma.user.count({ where: { familyId, role: 'PARENT', deactivatedAt: null } });
+    },
+
     recordFailedLogin(userId: string, { maxAttempts, lockoutMs }: { maxAttempts: number; lockoutMs: number }) {
       return prisma.$transaction(async (tx) => {
         const user = await tx.user.update({

@@ -15,6 +15,7 @@ import { createMealPlanService } from './services/mealPlanService.js';
 import { createLaundryService } from './services/laundryService.js';
 import { createCustomNotificationService } from './services/customNotificationService.js';
 import { createMaintenanceService } from './services/maintenanceService.js';
+import { createPaymentGraceService } from './services/paymentGraceService.js';
 
 const app = createApp();
 const allowanceService = createAllowanceService(prisma);
@@ -24,6 +25,7 @@ const mealPlanService = createMealPlanService(prisma);
 const laundryService = createLaundryService(prisma);
 const customNotificationService = createCustomNotificationService(prisma);
 const maintenanceService = createMaintenanceService(prisma);
+const paymentGraceService = createPaymentGraceService(prisma);
 
 async function runAllowanceCatchUp() {
   try {
@@ -203,6 +205,19 @@ async function runMaintenance() {
   }
 }
 
+async function runPaymentGraceCheck() {
+  try {
+    const { reminded, deleted } = await paymentGraceService.checkGracePeriods();
+    if (reminded > 0 || deleted > 0) {
+      console.log(
+        `Paiement en attente : ${reminded} rappel(s) J-7 envoyé(s), ${deleted} famille(s) supprimée(s) après 30 jours.`,
+      );
+    }
+  } catch (err) {
+    console.error('Échec de la vérification des périodes de grâce de paiement :', err);
+  }
+}
+
 app.listen(env.port, () => {
   console.log(`API listening on http://localhost:${env.port}`);
   // All run immediately (catching up anything missed while the server was off), then hourly
@@ -214,6 +229,7 @@ app.listen(env.port, () => {
   void runLaundryNotificationCheck();
   void runCustomNotificationCheck();
   void runMaintenance();
+  void runPaymentGraceCheck();
   setInterval(() => void runAllowanceCatchUp(), 60 * 60 * 1000);
   setInterval(() => void runInterestCatchUp(), 60 * 60 * 1000);
   setInterval(() => void runChoreReminderCheck(), 60 * 60 * 1000);
@@ -225,4 +241,6 @@ app.listen(env.port, () => {
   // Log cleanup only needs to run roughly once a day — every 24h is plenty, no need to
   // re-check the 30-day cutoff more often than that.
   setInterval(() => void runMaintenance(), 24 * 60 * 60 * 1000);
+  // Same cadence: the grace period is measured in days, checking more often buys nothing.
+  setInterval(() => void runPaymentGraceCheck(), 24 * 60 * 60 * 1000);
 });

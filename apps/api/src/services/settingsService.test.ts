@@ -17,7 +17,14 @@ describe('settingsService (seeded demo family)', () => {
 
   it('returns the default interest rate seeded for the family', async () => {
     const settings = await settingsService.getSettings('demo-family');
-    expect(settings).toEqual({ defaultInterestRateBps: 240, currency: 'CHF' });
+    expect(settings).toEqual({
+      defaultInterestRateBps: 240,
+      currency: 'CHF',
+      stocksEnabled: false,
+      mealPlanEnabled: false,
+      shoppingListEnabled: false,
+      laundryEnabled: false,
+    });
   });
 
   it('updates the interest rate and records an audit log entry', async () => {
@@ -52,5 +59,40 @@ describe('settingsService (seeded demo family)', () => {
     const logs = await db.prisma.auditLog.findMany({ where: { action: 'CURRENCY_UPDATED' } });
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ actorId: 'demo-papa', entityType: 'Settings' });
+  });
+
+  describe('subscription tier section gating', () => {
+    it('refuses to enable a paid section on the free tier', async () => {
+      // The seeded demo family defaults to ESSENTIEL, which doesn't unlock these sections.
+      await expect(
+        settingsService.updateFeatureFlags({
+          familyId: 'demo-family',
+          actorId: 'demo-papa',
+          flags: { mealPlanEnabled: true },
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('allows disabling a section on the free tier (only enabling is gated)', async () => {
+      const updated = await settingsService.updateFeatureFlags({
+        familyId: 'demo-family',
+        actorId: 'demo-papa',
+        flags: { mealPlanEnabled: false },
+      });
+      expect(updated.mealPlanEnabled).toBe(false);
+    });
+
+    it('allows enabling a section once the family is upgraded', async () => {
+      await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'FAMILLE' } });
+
+      const updated = await settingsService.updateFeatureFlags({
+        familyId: 'demo-family',
+        actorId: 'demo-papa',
+        flags: { mealPlanEnabled: true },
+      });
+      expect(updated.mealPlanEnabled).toBe(true);
+
+      await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'ESSENTIEL' } });
+    });
   });
 });

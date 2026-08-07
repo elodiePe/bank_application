@@ -5,6 +5,7 @@ import type {
   LoginFamilyInput,
   RegisterFamilyInput,
   RequestPasswordResetInput,
+  VerifyOwnerMfaInput,
 } from '@banque-familiale/shared';
 import { ApiError } from '../services/api.js';
 import {
@@ -16,6 +17,7 @@ import {
   registerFamily,
   requestAccountDeletion,
   requestFamilyPasswordReset,
+  verifyOwnerMfa,
 } from '../services/familyAuth.service.js';
 
 export const CURRENT_FAMILY_QUERY_KEY = ['family-auth', 'me'] as const;
@@ -47,9 +49,14 @@ export function useRegisterFamily() {
 }
 
 export function useLoginFamily() {
+  // Just starts the MFA challenge — no session yet, so nothing to invalidate here.
+  return useMutation({ mutationFn: (input: LoginFamilyInput) => loginFamily(input) });
+}
+
+export function useVerifyOwnerMfa() {
   const invalidate = useInvalidateCurrentFamily();
   return useMutation({
-    mutationFn: (input: LoginFamilyInput) => loginFamily(input),
+    mutationFn: (input: VerifyOwnerMfaInput) => verifyOwnerMfa(input),
     onSuccess: invalidate,
   });
 }

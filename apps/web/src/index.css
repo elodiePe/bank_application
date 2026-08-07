@@ -3,8 +3,11 @@
 @tailwind utilities;
 
 /* Safety net against any accidental horizontal overflow — this is a single-column,
-   mobile-first layout, so the page itself should never scroll sideways. */
-html,
-body {
+   mobile-first layout, so the page itself should never scroll sideways.
+   Only set on <html>: setting overflow-x on both html AND body makes the browser compute
+   overflow-y: auto on both too (per spec, an axis can't stay "visible" once the other axis
+   isn't) — that turns both into scroll containers and breaks position: sticky for any
+   element whose sticky ancestor resolves to the one that isn't actually scrolling. */
+html {
   overflow-x: hidden;
 }

@@ -18,3 +18,5 @@ export * from './laundry.js';
 export * from './customNotification.js';
 export * from './personalTask.js';
 export * from './savingsGoal.js';
+export * from './contact.js';
+export * from './subscription.js';

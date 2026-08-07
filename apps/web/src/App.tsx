@@ -15,6 +15,9 @@ import { VerifyEmailPage } from './pages/VerifyEmailPage.js';
 import { DeleteFamilyPage } from './pages/DeleteFamilyPage.js';
 import { ForgotFamilyPasswordPage } from './pages/ForgotFamilyPasswordPage.js';
 import { ResetPasswordPage } from './pages/ResetPasswordPage.js';
+import { ContactPage } from './pages/ContactPage.js';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage.js';
+import { TermsPage } from './pages/TermsPage.js';
 import { RequireAuth } from './components/RequireAuth.js';
 import { RequireFamilyOwner } from './components/RequireFamilyOwner.js';
 
@@ -29,6 +32,9 @@ export function App() {
         <Route path="/delete-family" element={<DeleteFamilyPage />} />
         <Route path="/forgot-password" element={<ForgotFamilyPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route
           path="/login"
           element={

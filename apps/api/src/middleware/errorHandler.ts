@@ -14,6 +14,14 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
     return;
   }
 
+  // Safety net: a service should normally check uniqueness itself and throw a ConflictError
+  // with a specific message (see memberService.setOwnEmail) — this only catches a case that
+  // slipped through without one, so it never leaks as a raw 500.
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    res.status(409).json({ error: 'CONFLICT' });
+    return;
+  }
+
   console.error(err);
   res.status(500).json({ error: 'INTERNAL_ERROR' });
 }

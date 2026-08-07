@@ -49,5 +49,7 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: CONTACT_EMAIL
+        sync: false
       - key: FINNHUB_API_KEY
         sync: false

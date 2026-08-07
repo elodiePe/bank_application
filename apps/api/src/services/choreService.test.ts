@@ -355,6 +355,64 @@ describe('choreService (seeded demo family)', () => {
     expect(pending.some((c) => c.id === completion.id)).toBe(true);
   });
 
+  it('listFamilyChores/listMyChores report the right current-period status for each chore, even mixed', async () => {
+    // Regression test for the batched current-period lookup (was one findLatestForPeriod call
+    // per chore) — three chores in different states, to check the batching doesn't cross wires
+    // between them (e.g. attach one chore's completion to a different chore in the list).
+    const untouched = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-matthieu',
+      title: 'Jamais fait (untouched)',
+      rewardType: 'MONEY',
+      rewardCents: 20,
+      recurrence: 'DAILY',
+    });
+    const pendingChore = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-matthieu',
+      title: 'En attente (pending)',
+      rewardType: 'MONEY',
+      rewardCents: 40,
+      recurrence: 'WEEKLY',
+    });
+    const approvedChore = await service.createChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-matthieu',
+      title: 'Approuvée (approved)',
+      rewardType: 'POINTS',
+      rewardPoints: 10,
+      recurrence: 'ONCE',
+    });
+
+    await service.completeChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-matthieu',
+      choreId: pendingChore.id,
+    });
+    const approvedCompletion = await service.completeChore({
+      familyId: 'demo-family',
+      childUserId: 'demo-matthieu',
+      choreId: approvedChore.id,
+    });
+    await service.approveCompletion({
+      familyId: 'demo-family',
+      completionId: approvedCompletion.id,
+      actorId: 'demo-papa',
+    });
+
+    const familyChores = await service.listFamilyChores('demo-family');
+    expect(familyChores.find((c) => c.id === untouched.id)?.currentPeriodStatus).toBeNull();
+    expect(familyChores.find((c) => c.id === pendingChore.id)?.currentPeriodStatus).toBe('PENDING');
+    expect(familyChores.find((c) => c.id === approvedChore.id)?.currentPeriodStatus).toBe('APPROVED');
+
+    const mine = await service.listMyChores('demo-matthieu');
+    expect(mine.find((c) => c.id === untouched.id)?.currentPeriodStatus).toBeNull();
+    expect(mine.find((c) => c.id === pendingChore.id)?.currentPeriodStatus).toBe('PENDING');
+    // The ONCE chore goes inactive once approved, so it drops out of listMyChores entirely —
+    // same pre-existing behavior as before the batching change, just confirming it still holds.
+    expect(mine.find((c) => c.id === approvedChore.id)).toBeUndefined();
+  });
+
   it('reminds the child once a DAILY chore has sat undone past the threshold, and never twice for the same day', async () => {
     const chore = await service.createChore({
       familyId: 'demo-family',

@@ -1,9 +1,19 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { registerFamilySchema, type RegisterFamilyInput } from '@banque-familiale/shared';
+import {
+  registerFamilySchema,
+  SUBSCRIPTION_TIER_ANNUAL_CHF,
+  SUBSCRIPTION_TIER_LABELS,
+  SUBSCRIPTION_TIER_MONTHLY_CHF,
+  SUBSCRIPTION_TIERS,
+  type RegisterFamilyInput,
+  type SubscriptionTier,
+} from '@banque-familiale/shared';
 import { useRegisterFamily } from '../hooks/useFamilyAuth.js';
 import { ApiError } from '../services/api.js';
+import { PENDING_SUBSCRIPTION_TIER_KEY } from '../utils/pendingSubscriptionTier.js';
 
 const ERROR_MESSAGES: Record<string, string> = {
   EMAIL_TAKEN: 'Une famille existe déjà avec cette adresse e-mail.',
@@ -13,6 +23,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 export function RegisterFamilyPage() {
   const navigate = useNavigate();
   const registerFamily = useRegisterFamily();
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
 
   const {
     register,
@@ -21,6 +32,11 @@ export function RegisterFamilyPage() {
   } = useForm<RegisterFamilyInput>({ resolver: zodResolver(registerFamilySchema) });
 
   function onSubmit(values: RegisterFamilyInput) {
+    if (!selectedTier) return;
+    // Read back right after the first parent is created (see LoginPage's bootstrap flow) —
+    // the account itself always starts on ESSENTIEL; a paid choice here only takes effect
+    // once that step redirects to Stripe Checkout and the webhook confirms payment.
+    sessionStorage.setItem(PENDING_SUBSCRIPTION_TIER_KEY, selectedTier);
     registerFamily.mutate(values, { onSuccess: () => navigate('/login', { replace: true }) });
   }
 
@@ -75,6 +91,61 @@ export function RegisterFamilyPage() {
           <p className="text-sm text-red-600 dark:text-red-400">{errors.ownerPassword.message}</p>
         )}
 
+        <label className="flex items-start gap-2 text-sm" htmlFor="acceptedTerms">
+          <input
+            id="acceptedTerms"
+            type="checkbox"
+            {...register('acceptedTerms')}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-700"
+          />
+          <span>
+            J'accepte les{' '}
+            <Link to="/terms" target="_blank" className="text-brand-600 hover:underline dark:text-brand-400">
+              CGU
+            </Link>{' '}
+            et la{' '}
+            <Link to="/privacy" target="_blank" className="text-brand-600 hover:underline dark:text-brand-400">
+              politique de confidentialité
+            </Link>
+            .
+          </span>
+        </label>
+        {errors.acceptedTerms && (
+          <p className="text-sm text-red-600 dark:text-red-400">{errors.acceptedTerms.message}</p>
+        )}
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-sm font-medium">Choisissez votre plan</legend>
+          {SUBSCRIPTION_TIERS.map((tier) => (
+            <label
+              key={tier}
+              className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 text-left transition-colors ${
+                selectedTier === tier
+                  ? 'border-brand-400 bg-brand-50 dark:border-brand-700 dark:bg-brand-900/30'
+                  : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800'
+              }`}
+            >
+              <span>
+                <span className="block text-sm font-medium">{SUBSCRIPTION_TIER_LABELS[tier]}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                  {SUBSCRIPTION_TIER_MONTHLY_CHF[tier] === 0
+                    ? 'Gratuit'
+                    : `${SUBSCRIPTION_TIER_MONTHLY_CHF[tier]} CHF / mois — facturé ${SUBSCRIPTION_TIER_ANNUAL_CHF[tier]} CHF une fois par an`}
+                </span>
+              </span>
+              <input
+                type="radio"
+                name="subscriptionTier"
+                value={tier}
+                required
+                checked={selectedTier === tier}
+                onChange={() => setSelectedTier(tier)}
+                className="h-4 w-4"
+              />
+            </label>
+          ))}
+        </fieldset>
+
         {registerFamily.isError && (
           <p className="text-sm text-red-600 dark:text-red-400">
             {registerFamily.error instanceof ApiError
@@ -85,7 +156,7 @@ export function RegisterFamilyPage() {
 
         <button
           type="submit"
-          disabled={registerFamily.isPending}
+          disabled={registerFamily.isPending || !selectedTier}
           className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
           {registerFamily.isPending ? 'Création…' : 'Créer votre famille'}

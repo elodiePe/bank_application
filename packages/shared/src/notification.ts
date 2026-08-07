@@ -23,7 +23,8 @@ export type NotificationType =
   | 'MEAL_PLAN_TURN'
   | 'LAUNDRY_TURN'
   | 'SHOPPING_TRIP'
-  | 'GENERIC';
+  | 'GENERIC'
+  | 'PAYMENT_PAST_DUE';
 
 export interface NotificationSummary {
   id: string;
@@ -127,6 +128,9 @@ export function categoryForNotificationType(type: NotificationType): Notificatio
     case 'GENERIC':
       return 'CUSTOM';
     case 'CREDENTIAL_RESET_REQUESTED':
+    // A family risking deletion for non-payment must always see this, regardless of
+    // notification preferences — same reasoning as CREDENTIAL_RESET_REQUESTED.
+    case 'PAYMENT_PAST_DUE':
       return null;
     default: {
       const _exhaustive: never = type;

@@ -33,6 +33,19 @@ export function createChoreCompletionRepository(prisma: Db) {
       });
     },
 
+    /** Batched form of findLatestForPeriod for a whole list of chores at once — one round trip
+     * instead of one per chore. `since` should be the earliest of the chores' own period starts,
+     * so the query only pulls rows that could possibly match one of them. Caller picks, per
+     * choreId, the first row (already createdAt-desc) whose periodStart matches that chore's
+     * own period. */
+    listSince(choreIds: string[], since: Date) {
+      if (choreIds.length === 0) return Promise.resolve([]);
+      return prisma.choreCompletion.findMany({
+        where: { choreId: { in: choreIds }, createdAt: { gte: since } },
+        orderBy: { createdAt: 'desc' },
+      });
+    },
+
     listPendingForFamily(familyId: string) {
       return prisma.choreCompletion.findMany({
         where: { status: 'PENDING', chore: { familyId } },

@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import type { PrismaClient } from '@prisma/client';
 import { env } from './utils/env.js';
-import { prisma } from './database/prismaClient.js';
+import { prisma as defaultPrisma } from './database/prismaClient.js';
 import { healthRouter } from './routes/health.routes.js';
 import { createAuthRouter } from './routes/auth.routes.js';
 import { createDashboardRouter } from './routes/dashboard.routes.js';
@@ -25,9 +26,12 @@ import { createLaundryRouter } from './routes/laundry.routes.js';
 import { createCustomNotificationRouter } from './routes/customNotification.routes.js';
 import { createPersonalTaskRouter } from './routes/personalTask.routes.js';
 import { createSavingsGoalRouter } from './routes/savingsGoal.routes.js';
+import { createContactRouter } from './routes/contact.routes.js';
+import { createExportRouter } from './routes/export.routes.js';
+import { createBillingRouter, createBillingWebhookHandler } from './routes/billing.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
-export function createApp() {
+export function createApp(prisma: PrismaClient = defaultPrisma) {
   const app = express();
 
   // Render (like most hosts) puts the app behind a reverse proxy, so every request's
@@ -39,12 +43,19 @@ export function createApp() {
 
   app.use(helmet());
   app.use(cors({ origin: env.webOrigin, credentials: true }));
+
+  // Mounted before express.json(): Stripe signature verification needs the exact raw bytes
+  // of the request body, which express.json() would already have parsed into an object (and
+  // in doing so, invalidated for signature checking) had it run first.
+  app.post('/billing/webhook', express.raw({ type: 'application/json' }), createBillingWebhookHandler(prisma));
+
   // Default 100kb is too small for the savings-goal photo (a resized JPEG as a base64 data
   // URL, ~33% larger than its binary size) — bumped just enough to fit that, not open-ended.
   app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser());
 
   app.use('/health', healthRouter);
+  app.use('/contact', createContactRouter());
   app.use('/family-auth', createFamilyAuthRouter(prisma));
   app.use('/auth', createAuthRouter(prisma));
   app.use('/dashboard', createDashboardRouter(prisma));
@@ -65,6 +76,8 @@ export function createApp() {
   app.use('/custom-notifications', createCustomNotificationRouter(prisma));
   app.use('/personal-tasks', createPersonalTaskRouter(prisma));
   app.use('/savings-goal', createSavingsGoalRouter(prisma));
+  app.use('/export', createExportRouter(prisma));
+  app.use('/billing', createBillingRouter(prisma));
 
   app.use(errorHandler);
 

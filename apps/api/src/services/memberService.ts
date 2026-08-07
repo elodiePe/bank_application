@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import type { PrismaClient } from '@prisma/client';
 import type { ChildInterfaceLevel, FamilyMemberDetail } from '@banque-familiale/shared';
+import { SUBSCRIPTION_TIER_MAX_CHILDREN, SUBSCRIPTION_TIER_MAX_PARENTS } from '@banque-familiale/shared';
 import { createUserRepository } from '../repositories/userRepository.js';
 import { createRefreshSessionRepository } from '../repositories/refreshSessionRepository.js';
 import { createAuditLogRepository } from '../repositories/auditLogRepository.js';
+import { createFamilyRepository } from '../repositories/familyRepository.js';
 import { hashPin } from './authStrategies.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { sendEmail } from './emailService.js';
@@ -52,6 +54,7 @@ export function createMemberService(prisma: PrismaClient) {
   const userRepo = createUserRepository(prisma);
   const refreshSessionRepo = createRefreshSessionRepository(prisma);
   const auditLogRepo = createAuditLogRepository(prisma);
+  const familyRepo = createFamilyRepository(prisma);
   const notificationService = createNotificationService(prisma);
 
   async function assertBelongsToFamily(userId: string, familyId: string) {
@@ -177,7 +180,31 @@ export function createMemberService(prisma: PrismaClient) {
       canManageSettings?: boolean;
       canManageFamily?: boolean;
       interfaceLevel?: ChildInterfaceLevel;
+      parentalConsent?: boolean;
     }): Promise<FamilyMemberDetail> {
+      const family = await familyRepo.findById(params.familyId);
+      if (params.role === 'CHILD') {
+        const maxChildren = family ? SUBSCRIPTION_TIER_MAX_CHILDREN[family.subscriptionTier] : null;
+        if (maxChildren !== null) {
+          const currentCount = await userRepo.countActiveChildren(params.familyId);
+          if (currentCount >= maxChildren) {
+            throw new ForbiddenError(
+              `Votre abonnement actuel est limité à ${maxChildren} enfant${maxChildren > 1 ? 's' : ''}. Passez à un plan supérieur pour en ajouter davantage.`,
+            );
+          }
+        }
+      } else {
+        const maxParents = family ? SUBSCRIPTION_TIER_MAX_PARENTS[family.subscriptionTier] : null;
+        if (maxParents !== null) {
+          const currentCount = await userRepo.countActiveParents(params.familyId);
+          if (currentCount >= maxParents) {
+            throw new ForbiddenError(
+              `Votre abonnement actuel est limité à ${maxParents} parent${maxParents > 1 ? 's' : ''}. Passez à un plan supérieur pour en ajouter davantage.`,
+            );
+          }
+        }
+      }
+
       const created = await createUser({
         familyId: params.familyId,
         firstName: params.firstName,
@@ -195,7 +222,10 @@ export function createMemberService(prisma: PrismaClient) {
         action: 'MEMBER_ADDED',
         entityType: 'User',
         entityId: created.id,
-        metadata: { firstName: params.firstName, role: params.role },
+        metadata:
+          params.role === 'CHILD'
+            ? { firstName: params.firstName, role: params.role, parentalConsent: true }
+            : { firstName: params.firstName, role: params.role },
       });
 
       const full = await userRepo.listAllFamilyMembers(params.familyId);
@@ -219,12 +249,20 @@ export function createMemberService(prisma: PrismaClient) {
         throw new ForbiddenError('Cette famille a déjà des membres.');
       }
 
+      // User.email is unique across every family, not just this one — if this owner email
+      // happens to already be attached to some other member account (a different family),
+      // syncing it here would violate that constraint. It's a nice-to-have convenience, not
+      // something worth failing account creation over, so it's just skipped in that case;
+      // the parent can still set their own email later from "Mon compte" (which does the
+      // same uniqueness check and reports it clearly if it happens again).
+      const emailTaken = await userRepo.findByEmail(params.ownerEmail);
+
       const created = await createUser({
         familyId: params.familyId,
         firstName: params.firstName,
         role: 'PARENT',
         pin: params.pin,
-        email: params.ownerEmail,
+        email: emailTaken ? undefined : params.ownerEmail,
         isAdmin: true,
       });
 

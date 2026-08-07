@@ -6,6 +6,7 @@ import {
   registerFamilySchema,
   requestPasswordResetSchema,
   verifyEmailSchema,
+  verifyOwnerMfaSchema,
 } from '@banque-familiale/shared';
 import type { FamilyAuthService } from '../services/familyAuthService.js';
 import {
@@ -29,6 +30,11 @@ const LOGIN_FAILURE_STATUS: Record<string, number> = {
 const VERIFY_EMAIL_FAILURE_STATUS: Record<string, number> = {
   invalid_token: 400,
   not_found: 404,
+};
+
+const VERIFY_MFA_FAILURE_STATUS: Record<string, number> = {
+  invalid_code: 401,
+  expired: 410,
 };
 
 const CONFIRM_DELETION_FAILURE_STATUS: Record<string, number> = {
@@ -71,6 +77,25 @@ export function createFamilyAuthController(familyAuthService: FamilyAuthService)
       const result = await familyAuthService.loginFamilyOwner(parsed.data);
       if (!result.ok) {
         res.status(LOGIN_FAILURE_STATUS[result.reason] ?? 401).json({ error: result.reason.toUpperCase() });
+        return;
+      }
+
+      // No cookie yet — the password alone doesn't finish the login, the emailed code does.
+      res
+        .status(200)
+        .json({ mfaRequired: true, familyId: result.familyId, ...(result.devCode ? { devCode: result.devCode } : {}) });
+    },
+
+    async verifyMfa(req: Request, res: Response) {
+      const parsed = verifyOwnerMfaSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'INVALID_INPUT' });
+        return;
+      }
+
+      const result = await familyAuthService.verifyOwnerMfaCode(parsed.data);
+      if (!result.ok) {
+        res.status(VERIFY_MFA_FAILURE_STATUS[result.reason] ?? 401).json({ error: result.reason.toUpperCase() });
         return;
       }
 

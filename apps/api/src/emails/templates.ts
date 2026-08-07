@@ -21,6 +21,58 @@ export function verifyEmailTemplate(params: { familyName: string; verifyUrl: str
   };
 }
 
+export function ownerMfaCodeTemplate(params: { familyName: string; code: string }): EmailContent {
+  const familyName = escapeHtml(params.familyName);
+  return {
+    subject: `${params.code} — votre code de connexion FamilyApp`,
+    html: emailLayout({
+      previewText: `Votre code de connexion : ${params.code}`,
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:18px;">Code de connexion</h1>
+        <p style="margin:0 0 8px;">Bonjour ${familyName}, voici le code à saisir pour terminer la connexion :</p>
+        <p style="margin:16px 0;font-size:28px;font-weight:700;letter-spacing:4px;text-align:center;">${params.code}</p>
+        <p style="margin:20px 0 0;font-size:12px;color:#64748b;">Ce code expire dans 10 minutes. Si vous n'êtes pas à l'origine de cette tentative de connexion, ignorez cet e-mail — sans ce code, personne ne peut accéder à votre compte.</p>
+      `,
+    }),
+  };
+}
+
+export function contactMessageTemplate(params: { name?: string; email: string; message: string }): EmailContent {
+  const name = params.name ? escapeHtml(params.name) : null;
+  const email = escapeHtml(params.email);
+  // Line breaks are the only formatting a plain-text message can carry — converted to <br/>
+  // after escaping, so nothing in the message body can inject markup.
+  const messageHtml = escapeHtml(params.message).replace(/\n/g, '<br/>');
+  return {
+    subject: `Nouveau message de contact${name ? ` — ${name}` : ''}`,
+    html: emailLayout({
+      previewText: `Message de contact de ${name ?? email}`,
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:18px;">Nouveau message depuis la page de contact</h1>
+        <p style="margin:0 0 4px;"><strong>De :</strong> ${name ? `${name} — ` : ''}${email}</p>
+        <p style="margin:16px 0 0;white-space:pre-wrap;">${messageHtml}</p>
+      `,
+    }),
+  };
+}
+
+export function contactConfirmationTemplate(params: { name?: string; message: string }): EmailContent {
+  const greeting = params.name ? escapeHtml(params.name) : 'là';
+  const messageHtml = escapeHtml(params.message).replace(/\n/g, '<br/>');
+  return {
+    subject: 'Ton message a bien été reçu — FamilyApp',
+    html: emailLayout({
+      previewText: 'On te répond dès que possible',
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:18px;">Salut ${greeting} 👋</h1>
+        <p style="margin:0 0 8px;">Merci pour ton message, on te répond dès que possible.</p>
+        <p style="margin:16px 0 4px;font-size:12px;color:#64748b;">Pour rappel, voici ce que tu nous as envoyé :</p>
+        <p style="margin:0;padding:12px;background:#f1f5f9;border-radius:8px;white-space:pre-wrap;">${messageHtml}</p>
+      `,
+    }),
+  };
+}
+
 export function passwordChangedTemplate(params: { firstName: string }): EmailContent {
   const firstName = escapeHtml(params.firstName);
   const when = new Date().toLocaleString('fr-CH', { dateStyle: 'long', timeStyle: 'short' });
@@ -115,6 +167,55 @@ export function accountDeletedTemplate(params: { familyName: string }): EmailCon
         <h1 style="margin:0 0 12px;font-size:18px;">Compte supprimé</h1>
         <p style="margin:0 0 8px;">Le compte famille "${familyName}" et toutes ses données ont été définitivement supprimés, comme demandé.</p>
         <p style="margin:16px 0 0;">Merci d'avoir utilisé FamilyApp.</p>
+      `,
+    }),
+  };
+}
+
+export function paymentPastDueTemplate(params: { familyName: string; billingUrl: string }): EmailContent {
+  const familyName = escapeHtml(params.familyName);
+  return {
+    subject: 'Paiement en attente sur votre abonnement — FamilyApp',
+    html: emailLayout({
+      previewText: `Le paiement de l'abonnement de ${familyName} est en attente`,
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:18px;">Paiement en attente</h1>
+        <p style="margin:0 0 8px;">Le paiement de l'abonnement de la famille "${familyName}" n'a pas pu être effectué.</p>
+        <p style="margin:0 0 8px;">Vous avez <strong>30 jours</strong> pour régulariser le paiement ou changer de plan d'abonnement (y compris repasser au plan gratuit Essentiel). Passé ce délai, le compte et tout son historique (transactions, corvées, planning…) seront définitivement supprimés.</p>
+        ${emailButton({ href: params.billingUrl, label: 'Gérer mon abonnement' })}
+        <p style="margin:20px 0 0;font-size:12px;color:#64748b;">En attendant, votre famille garde l'accès à tout ce qu'elle a déjà — seules les nouvelles actions liées à l'abonnement sont mises en pause.</p>
+      `,
+    }),
+  };
+}
+
+export function paymentGraceReminderTemplate(params: { familyName: string; billingUrl: string }): EmailContent {
+  const familyName = escapeHtml(params.familyName);
+  return {
+    subject: 'Plus que 7 jours avant la suppression de votre compte — FamilyApp',
+    html: emailLayout({
+      previewText: `Le compte ${familyName} sera supprimé dans 7 jours sans action`,
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:18px;">Dernier rappel — 7 jours restants</h1>
+        <p style="margin:0 0 8px;">Le paiement de l'abonnement de la famille "${familyName}" est toujours en attente.</p>
+        <p style="margin:0 0 8px;">Sans régularisation ou changement de plan dans les <strong>7 prochains jours</strong>, le compte et tout son historique seront définitivement supprimés.</p>
+        ${emailButton({ href: params.billingUrl, label: 'Gérer mon abonnement' })}
+      `,
+    }),
+  };
+}
+
+export function accountDeletedForNonPaymentTemplate(params: { familyName: string }): EmailContent {
+  const familyName = escapeHtml(params.familyName);
+  return {
+    subject: 'Votre compte famille a été supprimé pour non-paiement — FamilyApp',
+    html: emailLayout({
+      previewText: `Le compte ${familyName} a été supprimé après 30 jours de paiement en attente`,
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:18px;">Compte supprimé</h1>
+        <p style="margin:0 0 8px;">Le paiement de l'abonnement de la famille "${familyName}" est resté en attente pendant 30 jours sans être régularisé. Conformément à l'avertissement envoyé, le compte et toutes ses données ont été définitivement supprimés.</p>
+        <p style="margin:0 0 8px;">Une copie de toutes vos données (comptes, transactions, corvées, planning…) au format JSON est jointe à cet e-mail.</p>
+        <p style="margin:16px 0 0;">Si vous souhaitez recréer un compte, vous pouvez le faire à tout moment depuis notre page d'accueil.</p>
       `,
     }),
   };

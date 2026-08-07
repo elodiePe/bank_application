@@ -1,0 +1,3 @@
+ALTER TABLE "Family" ADD COLUMN "ownerMfaCodeHash" TEXT;
+ALTER TABLE "Family" ADD COLUMN "ownerMfaCodeExpiresAt" TIMESTAMP(3);
+ALTER TABLE "Family" ADD COLUMN "ownerMfaCodeAttempts" INTEGER NOT NULL DEFAULT 0;

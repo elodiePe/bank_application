@@ -78,6 +78,7 @@ export function createMemberController(memberService: MemberService) {
         canManageSettings: parsed.data.canManageSettings,
         canManageFamily: parsed.data.canManageFamily,
         interfaceLevel: parsed.data.interfaceLevel,
+        parentalConsent: parsed.data.parentalConsent,
       });
       res.status(201).json(member);
     },

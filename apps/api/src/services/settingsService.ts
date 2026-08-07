@@ -1,7 +1,10 @@
 import type { FamilySettings } from '@banque-familiale/shared';
+import { SUBSCRIPTION_TIER_SECTIONS_UNLOCKED } from '@banque-familiale/shared';
 import type { PrismaClient } from '@prisma/client';
 import { createSettingsRepository } from '../repositories/settingsRepository.js';
 import { createAuditLogRepository } from '../repositories/auditLogRepository.js';
+import { createFamilyRepository } from '../repositories/familyRepository.js';
+import { ForbiddenError } from '../utils/errors.js';
 
 function toFamilySettings(s: {
   defaultInterestRateBps: number;
@@ -78,6 +81,17 @@ export function createSettingsService(prisma: PrismaClient) {
         laundryEnabled?: boolean;
       };
     }): Promise<FamilySettings> {
+      const enablingAnySection = Object.values(params.flags).some((v) => v === true);
+      if (enablingAnySection) {
+        const familyRepo = createFamilyRepository(prisma);
+        const family = await familyRepo.findById(params.familyId);
+        if (family && !SUBSCRIPTION_TIER_SECTIONS_UNLOCKED[family.subscriptionTier]) {
+          throw new ForbiddenError(
+            'Ces sections sont réservées aux plans Famille et Grande Famille. Passez à un plan supérieur pour les activer.',
+          );
+        }
+      }
+
       return prisma.$transaction(async (tx) => {
         const settingsRepo = createSettingsRepository(tx);
         const auditLogRepo = createAuditLogRepository(tx);

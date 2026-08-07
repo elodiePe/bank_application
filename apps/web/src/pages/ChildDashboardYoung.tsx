@@ -116,7 +116,7 @@ export function ChildDashboardYoung() {
         onClick={() => setMoreOpen((o) => !o)}
         className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-300 py-3 text-base font-semibold text-brand-700 hover:bg-brand-50 dark:border-brand-700 dark:text-brand-400 dark:hover:bg-brand-900/20"
       >
-        {moreOpen ? '🔼 Voir moins' : '✨ Mes quêtes, mon objectif et mes badges'}
+        {moreOpen ? '🔼 Voir moins' : '✨ Voir plus'}
         {!moreOpen && hasPendingChores && (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-xs font-bold text-white">
             {pendingChoreCount}
@@ -152,7 +152,7 @@ export function ChildDashboardYoung() {
               <SavingsGoalCard balanceCents={balanceCents} />
             </div>
 
-            <BadgeShelf badges={badges} />
+            {/* <BadgeShelf badges={badges} /> */}
           </motion.div>
         )}
       </AnimatePresence>

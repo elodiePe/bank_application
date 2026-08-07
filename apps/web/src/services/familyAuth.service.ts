@@ -3,9 +3,11 @@ import type {
   ConfirmPasswordResetInput,
   FamilySummary,
   LoginFamilyInput,
+  LoginFamilyMfaChallenge,
   RegisterFamilyInput,
   RequestPasswordResetInput,
   VerifyEmailInput,
+  VerifyOwnerMfaInput,
 } from '@banque-familiale/shared';
 import { apiGet, apiPost } from './api.js';
 
@@ -13,8 +15,12 @@ export function registerFamily(input: RegisterFamilyInput): Promise<FamilySummar
   return apiPost<FamilySummary>('/family-auth/register', input);
 }
 
-export function loginFamily(input: LoginFamilyInput): Promise<FamilySummary> {
-  return apiPost<FamilySummary>('/family-auth/login', input);
+export function loginFamily(input: LoginFamilyInput): Promise<LoginFamilyMfaChallenge> {
+  return apiPost<LoginFamilyMfaChallenge>('/family-auth/login', input);
+}
+
+export function verifyOwnerMfa(input: VerifyOwnerMfaInput): Promise<FamilySummary> {
+  return apiPost<FamilySummary>('/family-auth/verify-mfa', input);
 }
 
 export function logoutFamily(): Promise<void> {

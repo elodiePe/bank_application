@@ -1,11 +1,13 @@
+import { randomInt } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import type { Family, PrismaClient } from '@prisma/client';
 import { createFamilyRepository } from '../repositories/familyRepository.js';
 import { signEmailActionToken, signFamilyOwnerToken, verifyEmailActionToken } from './tokenService.js';
-import { sendEmail } from './emailService.js';
+import { sendEmail, sendEmailStrict } from './emailService.js';
 import {
   accountDeletedTemplate,
   deleteAccountRequestTemplate,
+  ownerMfaCodeTemplate,
   passwordChangedTemplate,
   resetPasswordRequestTemplate,
   verifyEmailTemplate,
@@ -15,14 +17,24 @@ import { env } from '../utils/env.js';
 const SALT_ROUNDS = 12;
 const LOCKOUT_MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+const MFA_CODE_TTL_MS = 10 * 60 * 1000;
+const MFA_MAX_ATTEMPTS = 5;
 
 export type RegisterFamilyResult =
   | { ok: true; familyId: string; familyName: string; token: string }
   | { ok: false; reason: 'email_taken' };
 
 export type LoginFamilyResult =
-  | { ok: true; familyId: string; familyName: string; token: string }
+  | { ok: true; mfaRequired: true; familyId: string; devCode?: string }
   | { ok: false; reason: 'not_found' | 'invalid_credential' | 'locked' };
+
+export type VerifyOwnerMfaResult =
+  | { ok: true; familyId: string; familyName: string; token: string }
+  | { ok: false; reason: 'invalid_code' | 'expired' };
+
+function generateSixDigitCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, '0');
+}
 
 export type VerifyEmailResult = { ok: true } | { ok: false; reason: 'invalid_token' | 'not_found' };
 
@@ -87,6 +99,44 @@ export function createFamilyAuthService(prisma: PrismaClient) {
       }
 
       await familyRepo.resetFailedOwnerLogins(family.id);
+
+      const code = generateSixDigitCode();
+      const codeHash = await bcrypt.hash(code, SALT_ROUNDS);
+      await familyRepo.setOwnerMfaChallenge(family.id, {
+        codeHash,
+        expiresAt: new Date(Date.now() + MFA_CODE_TTL_MS),
+      });
+
+      const { subject, html } = ownerMfaCodeTemplate({ familyName: family.name, code });
+      // Strict, not best-effort: without this email the user has no way to finish logging in,
+      // so a delivery failure must surface as an error rather than leave them stuck.
+      await sendEmailStrict({ to: family.ownerEmail, subject, html });
+
+      // Non-production only, and never logged/persisted anywhere else — lets integration
+      // tests and local dev exercise the MFA step without a real inbox. Guarded on nodeEnv,
+      // not on RESEND_API_KEY being set, so it can't accidentally leak in a real deployment.
+      const devCode = env.nodeEnv !== 'production' ? code : undefined;
+
+      return { ok: true, mfaRequired: true, familyId: family.id, ...(devCode ? { devCode } : {}) };
+    },
+
+    async verifyOwnerMfaCode(params: { familyId: string; code: string }): Promise<VerifyOwnerMfaResult> {
+      const family = await familyRepo.findById(params.familyId);
+      if (!family || !family.ownerMfaCodeHash || !family.ownerMfaCodeExpiresAt) {
+        return { ok: false, reason: 'expired' };
+      }
+      if (family.ownerMfaCodeExpiresAt.getTime() < Date.now()) {
+        await familyRepo.clearOwnerMfaChallenge(family.id);
+        return { ok: false, reason: 'expired' };
+      }
+
+      const valid = await bcrypt.compare(params.code, family.ownerMfaCodeHash);
+      if (!valid) {
+        await familyRepo.recordFailedOwnerMfaAttempt(family.id, MFA_MAX_ATTEMPTS);
+        return { ok: false, reason: 'invalid_code' };
+      }
+
+      await familyRepo.clearOwnerMfaChallenge(family.id);
       return { ok: true, familyId: family.id, familyName: family.name, token: toToken(family) };
     },
 

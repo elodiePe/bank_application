@@ -16,6 +16,14 @@ enum Role {
   CHILD
 }
 
+/// Mirrors the three plans shown on the pricing page (packages/shared/src/subscription.ts is
+/// the single source of truth for what each tier actually unlocks — child limit, sections).
+enum SubscriptionTier {
+  ESSENTIEL
+  FAMILLE
+  GRANDE_FAMILLE
+}
+
 /// Which child dashboard variant to render — chosen directly by a parent (not derived
 /// from a birth date), since a parent knows their own child's maturity better than an
 /// age calculation would. Ignored for PARENT users.
@@ -122,6 +130,7 @@ enum NotificationType {
   LAUNDRY_TURN
   SHOPPING_TRIP
   GENERIC
+  PAYMENT_PAST_DUE
 }
 
 /// Coarse grouping of NotificationType, used only for the per-user on/off preference below —
@@ -167,9 +176,41 @@ model Family {
   ownerFailedLoginAttempts Int       @default(0)
   ownerLockedUntil         DateTime?
 
+  /// Set at registration, when the CGU/politique de confidentialité checkbox is accepted —
+  /// demonstrable proof of consent (GDPR Art. 7(1)/nLPD). Null for families that registered
+  /// before this existed.
+  termsAcceptedAt DateTime?
+
   /// Set once the first parent finishes the guided setup wizard (add first child,
   /// allowance, interest rate, push notifications). Null = wizard still pending.
   onboardingCompletedAt DateTime?
+
+  /// Billing — synced exclusively from verified Stripe webhook events (never from the client
+  /// redirect after checkout, which can't be trusted). ESSENTIEL is the default free tier, so
+  /// a family that never subscribes never touches Stripe at all.
+  subscriptionTier         SubscriptionTier @default(ESSENTIEL)
+  /// Created lazily on first checkout attempt — null until then.
+  stripeCustomerId         String?          @unique
+  stripeSubscriptionId     String?          @unique
+  /// Stripe's own status string (active, past_due, canceled, unpaid, ...) — kept verbatim
+  /// rather than re-modeled, so new Stripe statuses don't require a migration to display.
+  stripeSubscriptionStatus String?
+  stripePriceId            String?
+  stripeCurrentPeriodEnd   DateTime?
+
+  /// Set the moment a subscription that WAS paid (subscriptionTier was FAMILLE/GRANDE_FAMILLE)
+  /// drops out of active/trialing status — starts the 30-day grace period before the family and
+  /// its entire history are deleted. Null while never in this state, or once payment recovers.
+  paymentGracePeriodStartedAt DateTime?
+  /// Set once the J-7 reminder has actually been sent, so the daily check never sends it twice.
+  paymentGraceReminderSentAt DateTime?
+
+  /// Pending email-MFA challenge for the owner login, set once the password has already been
+  /// verified. The code itself is never stored in plaintext. Cleared on success, on expiry, or
+  /// once ownerMfaCodeAttempts hits the cap — any of those forces a fresh login from scratch.
+  ownerMfaCodeHash      String?
+  ownerMfaCodeExpiresAt DateTime?
+  ownerMfaCodeAttempts  Int       @default(0)
 
   users    User[]
   settings Settings?

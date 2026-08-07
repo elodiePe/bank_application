@@ -28,10 +28,12 @@ import {
   useUpdateInterestRate,
 } from '../hooks/useTransactionActions.js';
 import { usePushSubscription, type PushSupportState } from '../pwa/usePushSubscription.js';
+import { useSubscription } from '../hooks/useBilling.js';
 import { STORAGE_CURRENCY } from '../utils/currency.js';
 import { FEATURE_TOGGLES, type FeatureFlags } from '../utils/featureFlags.js';
 import { ApiError } from '../services/api.js';
 import { Select } from '../components/Select.js';
+import { InterfaceLevelInfo } from '../components/InterfaceLevelInfo.js';
 import { PermissionCheckboxes } from '../components/PermissionCheckboxes.js';
 import { GroupOrderEditor } from '../components/GroupOrderEditor.js';
 import { NotificationPreferences } from '../components/NotificationPreferences.js';
@@ -144,7 +146,7 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
   );
 }
 
-function FeaturesStep({ onNext }: { onNext: (flags: FeatureFlags) => void }) {
+function FeaturesStep({ sectionsUnlocked, onNext }: { sectionsUnlocked: boolean; onNext: (flags: FeatureFlags) => void }) {
   const updateFeatureFlags = useUpdateFeatureFlags();
   const [flags, setFlags] = useState<FeatureFlags>({
     stocksEnabled: false,
@@ -154,10 +156,14 @@ function FeaturesStep({ onNext }: { onNext: (flags: FeatureFlags) => void }) {
   });
 
   function toggle(key: keyof FeatureFlags) {
+    if (!sectionsUnlocked) return;
     setFlags((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   function onSubmit() {
+    // Essentiel can't have any of these on (enforced server-side too) — skip the write
+    // entirely rather than send a request that would just be rejected.
+    if (!sectionsUnlocked) return onNext(flags);
     updateFeatureFlags.mutate(flags, { onSuccess: () => onNext(flags) });
   }
 
@@ -165,35 +171,42 @@ function FeaturesStep({ onNext }: { onNext: (flags: FeatureFlags) => void }) {
     <StepShell>
       <h1 className="text-xl font-bold">Quelles sections activer ?</h1>
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        L'argent de poche et les tâches sont toujours actifs. Le reste est optionnel — active ce
-        qui t'intéresse, modifiable à tout moment depuis les Paramètres.
+        L'argent de poche et les tâches sont toujours actifs.{' '}
+        {sectionsUnlocked
+          ? 'Le reste est optionnel — active ce qui t\'intéresse, modifiable à tout moment depuis les Paramètres.'
+          : 'Les sections ci-dessous font partie des plans Famille et Grande Famille — tu pourras les activer après avoir mis à niveau ton abonnement, depuis Paramètres → Abonnement.'}
       </p>
       <div className="flex flex-col gap-2">
         {FEATURE_TOGGLES.map((toggleDef) => {
-          const isOn = flags[toggleDef.key];
+          const isOn = sectionsUnlocked && flags[toggleDef.key];
           return (
             <button
               key={toggleDef.key}
               type="button"
               onClick={() => toggle(toggleDef.key)}
+              disabled={!sectionsUnlocked}
               className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
-                isOn
-                  ? 'border-brand-400 bg-brand-50 dark:border-brand-700 dark:bg-brand-900/30'
-                  : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950'
+                !sectionsUnlocked
+                  ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-60 dark:border-slate-700 dark:bg-slate-900'
+                  : isOn
+                    ? 'border-brand-400 bg-brand-50 dark:border-brand-700 dark:bg-brand-900/30'
+                    : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950'
               }`}
             >
-              <span aria-hidden className="text-xl">{toggleDef.icon}</span>
+              <span aria-hidden className="text-xl">{sectionsUnlocked ? toggleDef.icon : '🔒'}</span>
               <span className="flex-1">
                 <span className="block font-medium">{toggleDef.label}</span>
                 <span className="block text-sm text-slate-500 dark:text-slate-400">{toggleDef.description}</span>
               </span>
-              <span
-                className={`h-6 w-11 shrink-0 rounded-full transition-colors ${isOn ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-700'}`}
-              >
+              {sectionsUnlocked && (
                 <span
-                  className={`block h-5 w-5 translate-y-0.5 rounded-full bg-white shadow transition-transform ${isOn ? 'translate-x-5' : 'translate-x-0.5'}`}
-                />
-              </span>
+                  className={`h-6 w-11 shrink-0 rounded-full transition-colors ${isOn ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                >
+                  <span
+                    className={`block h-5 w-5 translate-y-0.5 rounded-full bg-white shadow transition-transform ${isOn ? 'translate-x-5' : 'translate-x-0.5'}`}
+                  />
+                </span>
+              )}
             </button>
           );
         })}
@@ -214,6 +227,9 @@ const childFormSchema = z.object({
   firstName: z.string().trim().min(1, 'Le prénom est requis').max(50),
   pin: z.string().regex(/^\d{4}$/, 'Le code doit contenir 4 chiffres'),
   interfaceLevel: z.enum(['YOUNG', 'MIDDLE', 'TEEN']),
+  parentalConsent: z.boolean().refine((v) => v === true, {
+    message: "Confirme être le représentant légal de l'enfant pour continuer.",
+  }),
 });
 type ChildFormValues = z.infer<typeof childFormSchema>;
 
@@ -231,7 +247,13 @@ function AddChildStep({ isFirst, onNext }: { isFirst: boolean; onNext: (childUse
 
   function onSubmit(values: ChildFormValues) {
     addMember.mutate(
-      { firstName: values.firstName, role: 'CHILD', pin: values.pin, interfaceLevel: values.interfaceLevel },
+      {
+        firstName: values.firstName,
+        role: 'CHILD',
+        pin: values.pin,
+        interfaceLevel: values.interfaceLevel,
+        parentalConsent: values.parentalConsent,
+      },
       { onSuccess: (created) => onNext(created.id) },
     );
   }
@@ -268,9 +290,12 @@ function AddChildStep({ isFirst, onNext }: { isFirst: boolean; onNext: (childUse
         />
         {errors.pin && <p className="text-sm text-red-600 dark:text-red-400">{errors.pin.message}</p>}
 
-        <label className="text-sm font-medium" htmlFor="interfaceLevel">
-          Interface
-        </label>
+        <div className="flex items-center gap-1.5">
+          <label className="text-sm font-medium" htmlFor="interfaceLevel">
+            Interface
+          </label>
+          <InterfaceLevelInfo />
+        </div>
         <Controller
           name="interfaceLevel"
           control={control}
@@ -286,6 +311,19 @@ function AddChildStep({ isFirst, onNext }: { isFirst: boolean; onNext: (childUse
             />
           )}
         />
+
+        <label className="mt-1 flex items-start gap-2 text-sm" htmlFor="parentalConsent">
+          <input
+            id="parentalConsent"
+            type="checkbox"
+            {...register('parentalConsent')}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-700"
+          />
+          <span>Je confirme être le représentant légal de cet enfant et j'autorise le traitement de ses données.</span>
+        </label>
+        {errors.parentalConsent && (
+          <p className="text-sm text-red-600 dark:text-red-400">{errors.parentalConsent.message}</p>
+        )}
 
         {addMember.isError && (
           <p className="text-sm text-red-600 dark:text-red-400">
@@ -610,35 +648,52 @@ function PointsRewardsStep({
   );
 }
 
-function MoreChildrenStep({ onAddAnother, onDone }: { onAddAnother: () => void; onDone: () => void }) {
+function MoreChildrenStep({
+  atLimit,
+  maxChildren,
+  onAddAnother,
+  onDone,
+}: {
+  atLimit: boolean;
+  maxChildren: number | null;
+  onAddAnother: () => void;
+  onDone: () => void;
+}) {
   return (
     <StepShell>
       <h1 className="text-xl font-bold">Ajouter un autre enfant ?</h1>
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Tu peux configurer autant d'enfants que nécessaire — chacun avec son propre code et son
-        propre argent de poche.
+        {atLimit
+          ? `Ton abonnement actuel est limité à ${maxChildren} enfant${(maxChildren ?? 0) > 1 ? 's' : ''}. Passe à un plan supérieur depuis Paramètres → Abonnement pour en ajouter davantage.`
+          : "Tu peux configurer autant d'enfants que nécessaire — chacun avec son propre code et son propre argent de poche."}
       </p>
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onAddAnother}
-          className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
-        >
-          Oui, ajouter un enfant
-        </button>
+        {!atLimit && (
+          <button
+            type="button"
+            onClick={onAddAnother}
+            className="rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+          >
+            Oui, ajouter un enfant
+          </button>
+        )}
         <button
           type="button"
           onClick={onDone}
-          className="rounded-full border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className={
+            atLimit
+              ? 'rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700'
+              : 'rounded-full border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800'
+          }
         >
-          Non, continuer
+          {atLimit ? 'Continuer' : 'Non, continuer'}
         </button>
       </div>
     </StepShell>
   );
 }
 
-function AddParentsStep({ onNext }: { onNext: () => void }) {
+function AddParentsStep({ maxParents, onNext }: { maxParents: number | null; onNext: () => void }) {
   const addMember = useAddMember();
   const updatePermissions = useUpdateMemberPermissions();
   const [formOpen, setFormOpen] = useState(false);
@@ -702,12 +757,16 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
     );
   }
 
+  // The first parent (created via bootstrap, before this step ever runs) already counts as 1.
+  const atLimit = maxParents !== null && 1 + addedCount >= maxParents;
+
   return (
     <StepShell>
       <h1 className="text-xl font-bold">Ajouter un autre parent ?</h1>
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Optionnel — un autre parent pourra se connecter avec son propre code PIN. Tu pourras
-        aussi en ajouter plus tard depuis les Paramètres.
+        {atLimit
+          ? `Ton abonnement actuel est limité à ${maxParents} parent${(maxParents ?? 0) > 1 ? 's' : ''}. Passe à un plan supérieur depuis Paramètres → Abonnement pour en ajouter davantage.`
+          : 'Optionnel — un autre parent pourra se connecter avec son propre code PIN. Tu pourras aussi en ajouter plus tard depuis les Paramètres.'}
       </p>
 
       {addedCount > 0 && (
@@ -718,13 +777,15 @@ function AddParentsStep({ onNext }: { onNext: () => void }) {
 
       {!formOpen ? (
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setFormOpen(true)}
-            className="rounded-full border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-          >
-            + Ajouter un parent
-          </button>
+          {!atLimit && (
+            <button
+              type="button"
+              onClick={() => setFormOpen(true)}
+              className="rounded-full border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              + Ajouter un parent
+            </button>
+          )}
           <button
             type="button"
             onClick={onNext}
@@ -1106,6 +1167,12 @@ export function OnboardingWizard() {
   const overview = useParentOverview(phase === 'allowance');
   const completeOnboarding = useCompleteOnboarding();
   const push = usePushSubscription();
+  const subscription = useSubscription();
+  // Optimistic defaults while the query is still loading — the real limit is enforced
+  // server-side regardless, this only controls what the wizard shows in the meantime.
+  const sectionsUnlocked = subscription.data?.sectionsUnlocked ?? true;
+  const maxChildren = subscription.data?.maxChildren ?? null;
+  const maxParents = subscription.data?.maxParents ?? null;
 
   useEffect(() => {
     const progress: OnboardingProgress = { phase, history, childUserId, childCount, featureFlags };
@@ -1172,6 +1239,7 @@ export function OnboardingWizard() {
           {phase === 'currency' && <CurrencyStep onNext={() => goTo('features')} />}
           {phase === 'features' && (
             <FeaturesStep
+              sectionsUnlocked={sectionsUnlocked}
               onNext={(flags) => {
                 setFeatureFlags(flags);
                 goTo('child');
@@ -1210,9 +1278,14 @@ export function OnboardingWizard() {
             />
           )}
           {phase === 'moreChildren' && (
-            <MoreChildrenStep onAddAnother={() => goTo('child')} onDone={() => goTo('parents')} />
+            <MoreChildrenStep
+              atLimit={maxChildren !== null && childCount >= maxChildren}
+              maxChildren={maxChildren}
+              onAddAnother={() => goTo('child')}
+              onDone={() => goTo('parents')}
+            />
           )}
-          {phase === 'parents' && <AddParentsStep onNext={afterParents} />}
+          {phase === 'parents' && <AddParentsStep maxParents={maxParents} onNext={afterParents} />}
           {phase === 'mealPlan' && <MealPlanStep onNext={afterMealPlan} />}
           {phase === 'laundry' && <LaundryStep onNext={() => goTo('interest')} />}
           {phase === 'interest' && <InterestStep onNext={() => goTo('push')} />}

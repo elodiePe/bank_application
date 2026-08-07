@@ -22,6 +22,11 @@ export function createFamilyAuthRouter(prisma: PrismaClient) {
     familyAuthRateLimiter,
     asyncHandler((req, res) => controller.login(req, res)),
   );
+  router.post(
+    '/verify-mfa',
+    familyAuthRateLimiter,
+    asyncHandler((req, res) => controller.verifyMfa(req, res)),
+  );
   router.post('/logout', asyncHandler((req, res) => controller.logout(req, res)));
   router.get('/me', asyncHandler((req, res) => controller.me(req, res)));
   router.post(

@@ -16,6 +16,7 @@ import { ApiError } from '../services/api.js';
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_INPUT: 'Vérifie les informations saisies.',
+  FORBIDDEN: 'Limite d’enfants de votre abonnement atteinte. Passez à un plan supérieur dans Paramètres → Abonnement.',
 };
 
 interface AddMemberModalProps {
@@ -116,6 +117,20 @@ export function AddMemberModal({ onClose }: AddMemberModalProps) {
                 />
               )}
             />
+            <label className="mt-1 flex items-start gap-2 text-sm" htmlFor="parentalConsent">
+              <input
+                id="parentalConsent"
+                type="checkbox"
+                {...register('parentalConsent')}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-700"
+              />
+              <span>
+                Je confirme être le représentant légal de cet enfant et j'autorise le traitement de ses données.
+              </span>
+            </label>
+            {errors.parentalConsent && (
+              <p className="text-sm text-red-600 dark:text-red-400">{errors.parentalConsent.message}</p>
+            )}
           </>
         )}
 

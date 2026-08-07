@@ -65,6 +65,37 @@ function toCompletionSummary(completion: CompletionWithRelations): ChoreCompleti
   };
 }
 
+/** One round trip instead of one findLatestForPeriod call per chore — used by
+ * listFamilyChores/listMyChores, which otherwise N+1'd on every chore in the list. */
+async function batchFindCurrentPeriodCompletions(
+  prisma: PrismaClient,
+  chores: ChoreWithChild[],
+  now: Date,
+): Promise<Map<string, ChoreCompletion>> {
+  const result = new Map<string, ChoreCompletion>();
+  if (chores.length === 0) return result;
+
+  const periodsByChoreId = new Map(chores.map((chore) => [chore.id, periodStartFor(chore, now)]));
+  const earliestPeriod = new Date(Math.min(...Array.from(periodsByChoreId.values(), (d) => d.getTime())));
+
+  const completionRepo = createChoreCompletionRepository(prisma);
+  const recentCompletions = await completionRepo.listSince(
+    chores.map((c) => c.id),
+    earliestPeriod,
+  );
+
+  // Rows arrive createdAt-desc, so the first one seen per chore that actually falls in that
+  // chore's own current period is its latest — matching findLatestForPeriod's semantics.
+  for (const completion of recentCompletions) {
+    if (result.has(completion.choreId)) continue;
+    const period = periodsByChoreId.get(completion.choreId);
+    if (period && completion.periodStart.getTime() === period.getTime()) {
+      result.set(completion.choreId, completion);
+    }
+  }
+  return result;
+}
+
 export function createChoreService(prisma: PrismaClient) {
   const choreRepo = createChoreRepository(prisma);
   const completionRepo = createChoreCompletionRepository(prisma);
@@ -83,25 +114,15 @@ export function createChoreService(prisma: PrismaClient) {
     async listFamilyChores(familyId: string): Promise<ChoreSummary[]> {
       const chores = await choreRepo.listForFamily(familyId);
       const now = new Date();
-      return Promise.all(
-        chores.map(async (chore) => {
-          const period = periodStartFor(chore, now);
-          const completion = await completionRepo.findLatestForPeriod(chore.id, period);
-          return toChoreSummary(chore, completion);
-        }),
-      );
+      const currentCompletions = await batchFindCurrentPeriodCompletions(prisma, chores, now);
+      return chores.map((chore) => toChoreSummary(chore, currentCompletions.get(chore.id) ?? null));
     },
 
     async listMyChores(childUserId: string): Promise<ChoreSummary[]> {
       const now = new Date();
       const chores = await choreRepo.listActiveForChild(childUserId, now);
-      return Promise.all(
-        chores.map(async (chore) => {
-          const period = periodStartFor(chore, now);
-          const completion = await completionRepo.findLatestForPeriod(chore.id, period);
-          return toChoreSummary(chore, completion);
-        }),
-      );
+      const currentCompletions = await batchFindCurrentPeriodCompletions(prisma, chores, now);
+      return chores.map((chore) => toChoreSummary(chore, currentCompletions.get(chore.id) ?? null));
     },
 
     async createChore(params: {

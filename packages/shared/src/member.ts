@@ -60,18 +60,27 @@ export const bootstrapParentSchema = z.object({
 });
 export type BootstrapParentInput = z.infer<typeof bootstrapParentSchema>;
 
-export const addMemberSchema = z.object({
-  firstName: z.string().trim().min(1, 'Le prénom est requis').max(50),
-  role: z.enum(['PARENT', 'CHILD']),
-  pin: pinSchema,
-  /// Only meaningful when role is PARENT — defaults to full access when omitted.
-  canManageMoney: z.boolean().optional(),
-  canManageActions: z.boolean().optional(),
-  canManageSettings: z.boolean().optional(),
-  canManageFamily: z.boolean().optional(),
-  /// Only meaningful when role is CHILD — defaults to MIDDLE when omitted.
-  interfaceLevel: z.enum(['YOUNG', 'MIDDLE', 'TEEN']).optional(),
-});
+export const addMemberSchema = z
+  .object({
+    firstName: z.string().trim().min(1, 'Le prénom est requis').max(50),
+    role: z.enum(['PARENT', 'CHILD']),
+    pin: pinSchema,
+    /// Only meaningful when role is PARENT — defaults to full access when omitted.
+    canManageMoney: z.boolean().optional(),
+    canManageActions: z.boolean().optional(),
+    canManageSettings: z.boolean().optional(),
+    canManageFamily: z.boolean().optional(),
+    /// Only meaningful when role is CHILD — defaults to MIDDLE when omitted.
+    interfaceLevel: z.enum(['YOUNG', 'MIDDLE', 'TEEN']).optional(),
+    /// Required when role is CHILD — the acting parent confirming they're the child's legal
+    /// guardian and consent, on the child's behalf, to the processing of their data (GDPR
+    /// Art. 8). Not meaningful for role PARENT, who consents for themselves at registration.
+    parentalConsent: z.boolean().optional(),
+  })
+  .refine((data) => data.role !== 'CHILD' || data.parentalConsent === true, {
+    message: "Confirme être le représentant légal de l'enfant pour continuer.",
+    path: ['parentalConsent'],
+  });
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
 
 export const setChildInterfaceLevelSchema = z.object({

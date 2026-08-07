@@ -41,6 +41,10 @@ describe('memberService (seeded demo family)', () => {
       code: 'FORBIDDEN',
     });
 
+    // The seeded family already has 2 parents, past the free tier's limit of 1 — this test is
+    // about email uniqueness, not billing, so give it room via the unlimited tier.
+    await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'GRANDE_FAMILLE' } });
+
     // A freshly added parent has no email yet, so they can set one for the first time.
     const newParent = await service.addFamilyMember({
       familyId: 'demo-family',
@@ -72,6 +76,7 @@ describe('memberService (seeded demo family)', () => {
 
     // Clean up: later tests assume the seeded family's original parent count/composition.
     await db.prisma.user.deleteMany({ where: { id: { in: [newParent.id, anotherParent.id] } } });
+    await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'ESSENTIEL' } });
   });
 
   it('lets a parent change their own PIN only with the correct current one', async () => {
@@ -98,6 +103,10 @@ describe('memberService (seeded demo family)', () => {
   });
 
   it('adds a new family member (child gets a zero-balance account, parent needs a PIN too)', async () => {
+    // The seeded family already has 3 children, past the free tier's limit of 1 — this test
+    // is about member creation, not billing, so give it room via the unlimited tier.
+    await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'GRANDE_FAMILLE' } });
+
     const child = await service.addFamilyMember({
       familyId: 'demo-family',
       actorId: 'demo-papa',
@@ -124,9 +133,15 @@ describe('memberService (seeded demo family)', () => {
       pin: '6543',
     });
     expect(parent).toMatchObject({ role: 'PARENT', hasPinLogin: true, interfaceLevel: null });
+
+    // Restore the free tier so later tests (including the dedicated subscription-limit ones)
+    // start from the same default the seed leaves them in.
+    await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'ESSENTIEL' } });
   });
 
   it("lets a parent choose a child's interface level explicitly, and change it later", async () => {
+    await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'GRANDE_FAMILLE' } });
+
     const child = await service.addFamilyMember({
       familyId: 'demo-family',
       actorId: 'demo-papa',
@@ -153,6 +168,8 @@ describe('memberService (seeded demo family)', () => {
         interfaceLevel: 'YOUNG',
       }),
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+
+    await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'ESSENTIEL' } });
   });
 
   it('lets a parent reset another member\'s PIN, invalidating their sessions', async () => {
@@ -305,6 +322,64 @@ describe('memberService (seeded demo family)', () => {
       await expect(service.requestPinResetNotification('demo-family', 'demo-papa')).rejects.toMatchObject({
         code: 'INVALID_INPUT',
       });
+    });
+  });
+
+  describe('subscription tier child limit', () => {
+    it('refuses to add a child once the family\'s free-tier limit (1) is reached', async () => {
+      // The seeded demo family already has 3 children and defaults to ESSENTIEL (max 1).
+      await expect(
+        service.addFamilyMember({
+          familyId: 'demo-family',
+          actorId: 'demo-papa',
+          firstName: 'Trop',
+          role: 'CHILD',
+          pin: '9911',
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('allows adding a child once the family is upgraded to a tier with room', async () => {
+      await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'GRANDE_FAMILLE' } });
+
+      const child = await service.addFamilyMember({
+        familyId: 'demo-family',
+        actorId: 'demo-papa',
+        firstName: 'Quatrieme',
+        role: 'CHILD',
+        pin: '9922',
+      });
+      expect(child.role).toBe('CHILD');
+
+      await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'ESSENTIEL' } });
+    });
+
+    it('refuses to add a parent once the family\'s free-tier limit (1) is reached', async () => {
+      // The seeded demo family already has 2 parents (Papa, Maman) and defaults to ESSENTIEL (max 1).
+      await expect(
+        service.addFamilyMember({
+          familyId: 'demo-family',
+          actorId: 'demo-papa',
+          firstName: 'TropDeParents',
+          role: 'PARENT',
+          pin: '9933',
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('allows adding a parent once the family is upgraded to a paid tier (unlimited)', async () => {
+      await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'FAMILLE' } });
+
+      const parent = await service.addFamilyMember({
+        familyId: 'demo-family',
+        actorId: 'demo-papa',
+        firstName: 'TroisiemeParent',
+        role: 'PARENT',
+        pin: '9944',
+      });
+      expect(parent.role).toBe('PARENT');
+
+      await db.prisma.family.update({ where: { id: 'demo-family' }, data: { subscriptionTier: 'ESSENTIEL' } });
     });
   });
 });

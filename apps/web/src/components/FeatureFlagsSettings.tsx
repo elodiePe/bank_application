@@ -1,5 +1,6 @@
 import { useSettings, useUpdateFeatureFlags } from '../hooks/useTransactionActions.js';
 import { FEATURE_TOGGLES, type FeatureFlags } from '../utils/featureFlags.js';
+import { ApiError } from '../services/api.js';
 
 /** Lets a parent turn optional sections (Actions, Repas, Courses, Ménage) on or off after the
  * fact — the same 4 toggles offered once during onboarding, now reachable at any time. Turning
@@ -45,6 +46,13 @@ export function FeatureFlagsSettings() {
           </button>
         );
       })}
+      {updateFeatureFlags.isError && (
+        <p className="text-sm text-red-600 dark:text-red-400">
+          {updateFeatureFlags.error instanceof ApiError && updateFeatureFlags.error.code === 'FORBIDDEN'
+            ? 'Ces sections sont réservées aux plans Famille et Grande Famille — passe à un plan supérieur dans Abonnement.'
+            : 'Une erreur est survenue.'}
+        </p>
+      )}
     </div>
   );
 }

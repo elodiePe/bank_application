@@ -88,6 +88,27 @@ export function verifyEmailActionToken(token: string): EmailActionPayload | null
   }
 }
 
+export interface MfaChallengePayload {
+  familyId: string;
+}
+
+// Short — this token only proves "the password step already succeeded a moment ago", the
+// actual security boundary is the emailed 6-digit code checked server-side against the hash
+// stored on Family. No point letting a stale challenge linger.
+const MFA_CHALLENGE_TTL_SECONDS = 10 * 60;
+
+export function signMfaChallengeToken(payload: MfaChallengePayload): string {
+  return jwt.sign(payload, env.emailActionSecret, { expiresIn: MFA_CHALLENGE_TTL_SECONDS });
+}
+
+export function verifyMfaChallengeToken(token: string): MfaChallengePayload | null {
+  try {
+    return jwt.verify(token, env.emailActionSecret) as MfaChallengePayload;
+  } catch {
+    return null;
+  }
+}
+
 /** Same purpose as EmailActionPayload but addressed to a single family member's own
  * account (User.pinHash) rather than the family-owner login — the two are separate
  * identity domains, so this can't reuse EmailActionPayload's {familyId, email} shape. */

@@ -7,7 +7,7 @@ import { createAuditLogRepository } from '../repositories/auditLogRepository.js'
 import { createAuthController } from '../controllers/authController.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireFamilyOwner } from '../middleware/requireFamilyOwner.js';
-import { loginRateLimiter } from '../middleware/rateLimiters.js';
+import { loginRateLimiter, refreshRateLimiter } from '../middleware/rateLimiters.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { env } from '../utils/env.js';
 
@@ -35,7 +35,7 @@ export function createAuthRouter(prisma: PrismaClient) {
     loginRateLimiter,
     asyncHandler((req, res) => controller.loginPin(req, res)),
   );
-  router.post('/refresh', asyncHandler((req, res) => controller.refresh(req, res)));
+  router.post('/refresh', refreshRateLimiter, asyncHandler((req, res) => controller.refresh(req, res)));
   router.post('/logout', asyncHandler((req, res) => controller.logout(req, res)));
   router.get('/me', authenticate, asyncHandler((req, res) => controller.me(req, res)));
 

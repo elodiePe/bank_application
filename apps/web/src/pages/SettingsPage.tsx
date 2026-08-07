@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCurrentUser, usePermission } from '../hooks/useAuth.js';
 import { useParentMode } from '../hooks/useParentMode.js';
 import { useParentOverview } from '../hooks/useDashboard.js';
@@ -11,12 +12,15 @@ import { CurrencySettings } from '../components/CurrencySettings.js';
 import { WeeklyAllowanceSettings } from '../components/WeeklyAllowanceSettings.js';
 import { FamilyManagementPanel } from '../components/FamilyManagementPanel.js';
 import { FeatureFlagsSettings } from '../components/FeatureFlagsSettings.js';
+import { SubscriptionSettings } from '../components/SubscriptionSettings.js';
+import { ChildrenOverLimitBanner } from '../components/ChildrenOverLimitBanner.js';
 import { MyAccountSettings } from '../components/MyAccountSettings.js';
 import { PointsVisibilitySetting } from '../components/PointsVisibilitySetting.js';
 import { PushNotificationSettings } from '../components/PushNotificationSettings.js';
 import { DeleteFamilyPanel } from '../components/DeleteFamilyPanel.js';
 import { CustomNotifications } from '../components/CustomNotifications.js';
 import { NotificationPreferences } from '../components/NotificationPreferences.js';
+import { downloadFamilyData } from '../services/export.service.js';
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -31,6 +35,20 @@ export function SettingsPage() {
   const canToggleManagementMode = isParent || isTeen;
   const { parentModeEnabled, toggleParentMode } = useParentMode();
   const push = usePushSubscription();
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    setExportError(false);
+    try {
+      await downloadFamilyData();
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -96,6 +114,13 @@ export function SettingsPage() {
       )}
 
       {isParent && canManageSettings && (
+        <CollapsibleSection title="Abonnement">
+          {canManageFamily && <ChildrenOverLimitBanner />}
+          <SubscriptionSettings />
+        </CollapsibleSection>
+      )}
+
+      {isParent && canManageSettings && (
         <CollapsibleSection title="Sections">
           <FeatureFlagsSettings />
         </CollapsibleSection>
@@ -115,6 +140,58 @@ export function SettingsPage() {
 
       <CollapsibleSection title="Mon compte">
         <MyAccountSettings />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Confidentialité">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Consulte notre{' '}
+            <Link to="/privacy" className="text-brand-600 hover:underline dark:text-brand-400">
+              politique de confidentialité
+            </Link>{' '}
+            et nos{' '}
+            <Link to="/terms" className="text-brand-600 hover:underline dark:text-brand-400">
+              conditions générales
+            </Link>
+            .
+          </p>
+          {isParent && (
+            <>
+              <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
+                Télécharge une copie de toutes les données de ta famille (comptes, transactions, corvées,
+                planning…) au format JSON.
+              </p>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={exporting}
+                className="mt-3 rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+              >
+                {exporting ? 'Préparation…' : 'Télécharger mes données'}
+              </button>
+              {exportError && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  Le téléchargement a échoué. Réessaie plus tard.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Contact">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Une question, un problème, une suggestion ? Notre page de contact est accessible à tout moment,
+            même sans être connecté.
+          </p>
+          <Link
+            to="/contact"
+            className="mt-3 inline-block rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            Nous contacter
+          </Link>
+        </div>
       </CollapsibleSection>
 
       {isParent && (

@@ -4,15 +4,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { FamilyMemberSummary } from '@banque-familiale/shared';
+import type { FamilyMemberSummary, PaidSubscriptionTier } from '@banque-familiale/shared';
 import { bootstrapParentSchema, type BootstrapParentInput } from '@banque-familiale/shared';
 import { fetchFamilyMembers, loginWithPin } from '../services/auth.service.js';
 import { bootstrapParent } from '../services/member.service.js';
 import { ApiError } from '../services/api.js';
 import { useLogoutFamily } from '../hooks/useFamilyAuth.js';
+import { useStartCheckout } from '../hooks/useBilling.js';
 import { useRequestMemberPinReset, useRequestPinResetNotification } from '../hooks/useMembers.js';
 import { PinPad } from '../components/PinPad.js';
 import { assignPersonColors } from '../utils/personColors.js';
+import { PENDING_SUBSCRIPTION_TIER_KEY } from '../utils/pendingSubscriptionTier.js';
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_CREDENTIAL: 'Identifiant incorrect.',
@@ -62,6 +64,8 @@ export function LoginPage() {
   const requestPinReset = useRequestMemberPinReset();
   const requestPinResetNotification = useRequestPinResetNotification();
 
+  const startCheckout = useStartCheckout();
+
   const bootstrapMutation = useMutation({
     mutationFn: async (values: BootstrapParentInput) => {
       const created = await bootstrapParent(values);
@@ -69,6 +73,16 @@ export function LoginPage() {
     },
     onSuccess: () => {
       queryClient.clear();
+
+      // The plan chosen on RegisterFamilyPage — only readable now, since this is the first
+      // point a member access-token cookie (which /billing/* requires) exists.
+      const pendingTier = sessionStorage.getItem(PENDING_SUBSCRIPTION_TIER_KEY);
+      sessionStorage.removeItem(PENDING_SUBSCRIPTION_TIER_KEY);
+
+      if (pendingTier === 'FAMILLE' || pendingTier === 'GRANDE_FAMILLE') {
+        startCheckout.mutate({ tier: pendingTier as PaidSubscriptionTier, returnTo: '/onboarding' });
+        return;
+      }
       navigate('/onboarding', { replace: true });
     },
   });
@@ -168,9 +182,12 @@ export function LoginPage() {
                 {bootstrapMutation.isError && (
                   <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(bootstrapMutation.error)}</p>
                 )}
+                {startCheckout.isPending && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Redirection vers le paiement…</p>
+                )}
                 <button
                   type="submit"
-                  disabled={bootstrapMutation.isPending}
+                  disabled={bootstrapMutation.isPending || startCheckout.isPending}
                   className="mt-2 rounded-full bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
                 >
                   {bootstrapMutation.isPending ? 'Création…' : 'Créer mon compte'}

@@ -377,6 +377,38 @@ export function createNotificationService(prisma: PrismaClient) {
       );
     },
 
+    async notifyPaymentGracePeriodStarted(familyId: string) {
+      const members = await userRepo.listFamilyMembers(familyId);
+      const parents = members.filter((m) => m.role === 'PARENT');
+      if (parents.length === 0) return;
+
+      await createManyAndPush(
+        parents.map((p) => ({
+          userId: p.id,
+          type: 'PAYMENT_PAST_DUE',
+          title: 'Paiement en attente',
+          body: "Le paiement de l'abonnement n'a pas pu être effectué. Vous avez 30 jours pour régulariser ou changer de plan, sinon le compte et son historique seront supprimés.",
+        })),
+        ROUTE.parametres,
+      );
+    },
+
+    async notifyPaymentGraceReminder(familyId: string) {
+      const members = await userRepo.listFamilyMembers(familyId);
+      const parents = members.filter((m) => m.role === 'PARENT');
+      if (parents.length === 0) return;
+
+      await createManyAndPush(
+        parents.map((p) => ({
+          userId: p.id,
+          type: 'PAYMENT_PAST_DUE',
+          title: 'Plus que 7 jours',
+          body: 'Sans régularisation du paiement ou changement de plan dans les 7 prochains jours, le compte et son historique seront définitivement supprimés.',
+        })),
+        ROUTE.parametres,
+      );
+    },
+
     async notifyParentsOfDispute(params: {
       familyId: string;
       childFirstName: string;

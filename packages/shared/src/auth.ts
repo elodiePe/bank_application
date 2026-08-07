@@ -18,6 +18,9 @@ export const registerFamilySchema = z.object({
   familyName: z.string().trim().min(1, 'Le nom de la famille est requis').max(80),
   ownerEmail: z.string().trim().email('Adresse e-mail invalide'),
   ownerPassword: passwordSchema,
+  acceptedTerms: z.boolean().refine((v) => v === true, {
+    message: 'Tu dois accepter les CGU et la politique de confidentialité pour continuer.',
+  }),
 });
 export type RegisterFamilyInput = z.infer<typeof registerFamilySchema>;
 
@@ -26,6 +29,21 @@ export const loginFamilySchema = z.object({
   ownerPassword: z.string().min(1, 'Le mot de passe est requis'),
 });
 export type LoginFamilyInput = z.infer<typeof loginFamilySchema>;
+
+/** Returned by /family-auth/login: the password step alone never finishes the login, the
+ * emailed 6-digit code (verified via verifyOwnerMfaSchema below) does. */
+export interface LoginFamilyMfaChallenge {
+  mfaRequired: true;
+  familyId: string;
+  /** Only ever present outside production — a local/test convenience, never relied on by the UI. */
+  devCode?: string;
+}
+
+export const verifyOwnerMfaSchema = z.object({
+  familyId: z.string().min(1),
+  code: z.string().regex(/^\d{6}$/, 'Le code doit contenir 6 chiffres'),
+});
+export type VerifyOwnerMfaInput = z.infer<typeof verifyOwnerMfaSchema>;
 
 export interface FamilySummary {
   id: string;
@@ -99,7 +117,18 @@ export type ChildInterfaceLevel = 'YOUNG' | 'MIDDLE' | 'TEEN';
 export const CHILD_INTERFACE_LEVELS: ChildInterfaceLevel[] = ['YOUNG', 'MIDDLE', 'TEEN'];
 
 export const CHILD_INTERFACE_LEVEL_LABELS: Record<ChildInterfaceLevel, string> = {
-  YOUNG: '6-8 ans — très simplifié',
-  MIDDLE: '9-11 ans — standard',
-  TEEN: '12-14 ans — avancé',
+  YOUNG: 'Très simplifié',
+  MIDDLE: 'Standard',
+  TEEN: 'Avancé',
+};
+
+/// Shown next to the interface-level picker (onboarding, ajout de membre, gestion de la
+/// famille) so a parent can tell the three apart now that the labels no longer carry an age
+/// range — kept in sync with the actual behavioral differences: YOUNG has no navigation at
+/// all (DashboardRouter), MIDDLE gets the full nav but no "Mode gestion" access, TEEN adds
+/// "Mode gestion" (édition du planning repas/ménage) and visibilité de ses points.
+export const CHILD_INTERFACE_LEVEL_DESCRIPTIONS: Record<ChildInterfaceLevel, string> = {
+  YOUNG: 'Une seule page toute simple, sans menu ni navigation — pensé pour les plus jeunes.',
+  MIDDLE: 'Navigation complète (Argent, Maison, Demandes, Paramètres), comme un adulte, mais sans les outils de gestion avancés.',
+  TEEN: 'Comme Standard, avec en plus le "Mode gestion" pour modifier soi-même le planning des repas/du ménage.',
 };
